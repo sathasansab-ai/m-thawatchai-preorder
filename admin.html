@@ -1,0 +1,1902 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Portal | ระบบจัดการ Pre-Order เสื้อ เอ็ม ธวัชชัย</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Prompt & Bebas Neue -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- JsBarcode for shipping barcode -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <!-- Supabase Cloud Database Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Prompt', 'sans-serif'],
+            display: ['Bebas Neue', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              black: '#111827',
+              accent: '#EA580C',
+              accentHover: '#C2410C',
+              bg: '#F9FAFB',
+              card: '#FFFFFF',
+              border: '#E5E7EB'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @media print {
+      body * { visibility: hidden; }
+      #print-thermal-area, #print-thermal-area * { visibility: visible; }
+      #print-thermal-area {
+        position: absolute; left: 0; top: 0;
+        width: 100mm; height: 150mm; margin: 0; padding: 6mm;
+        background: white !important; color: black !important;
+        display: block !important; box-sizing: border-box;
+      }
+      @page { size: 100mm 150mm; margin: 0; }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans antialiased min-h-screen">
+
+  <!-- ================= LOGIN SCREEN ================= -->
+  <div id="login-modal" class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white border border-gray-200 max-w-sm w-full rounded-3xl p-8 text-center space-y-6 shadow-2xl">
+      <div class="w-16 h-16 rounded-2xl bg-black text-white font-display text-3xl font-black mx-auto flex items-center justify-center shadow-lg">
+        M
+      </div>
+      <div>
+        <h2 class="text-2xl font-bold uppercase text-gray-900">ระบบจัดการหลังบ้าน</h2>
+        <p class="text-xs text-gray-500 mt-1">M Thawatchai Pre-Order Admin Portal</p>
+      </div>
+
+      <form onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <input type="password" id="input-pin" maxlength="20" placeholder="กรอกรหัส PIN (เริ่มต้น: 1234)" required class="w-full text-center bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-lg font-mono tracking-widest text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500">
+          <span class="text-[11px] text-gray-500 block mt-2">รหัส PIN เริ่มต้นคือ <strong class="text-orange-600">1234</strong></span>
+        </div>
+        <button type="submit" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3.5 px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-md">
+          เข้าสู่ระบบ
+        </button>
+      </form>
+      <div class="pt-1">
+        <a href="index.html" class="text-xs text-gray-500 hover:text-gray-900 transition flex items-center justify-center space-x-1">
+          <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+          <span>กลับสู่หน้าร้านค้า</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MAIN ADMIN APP ================= -->
+  <div id="admin-app" class="hidden min-h-screen flex flex-col">
+    
+    <!-- Top Header -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <span class="w-9 h-9 bg-black text-white font-display text-xl flex items-center justify-center font-bold rounded-lg">M</span>
+          <div>
+            <span class="font-bold text-base text-gray-900 block leading-tight">M THAWATCHAI ADMIN</span>
+            <span class="text-[10px] text-orange-600 font-semibold tracking-wider uppercase">ระบบควบคุม & จัดการครบวงจร</span>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+          <button onclick="switchTab('settings')" id="db-status-badge" class="bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition" title="คลิกเพื่อไปที่การตั้งค่าฐานข้อมูล">
+            <span id="db-status-dot" class="w-2 h-2 rounded-full bg-gray-400"></span>
+            <span id="db-status-text">กำลังตรวจสอบฐานข้อมูล...</span>
+          </button>
+          <a href="index.html" target="_blank" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition">
+            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">ดูหน้าเว็บลูกค้า</span>
+          </a>
+          <button onclick="handleLogout()" class="text-red-600 hover:bg-red-50 px-3 py-2 rounded-xl text-xs font-bold transition">
+            ออกจากระบบ
+          </button>
+        </div>
+      </div>
+
+      <!-- TABS NAVIGATION -->
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 overflow-x-auto border-t border-gray-100 text-xs font-semibold">
+        <button onclick="switchTab('orders')" id="tab-btn-orders" class="tab-btn py-3.5 px-4 border-b-2 border-orange-600 text-orange-600 flex items-center space-x-2 whitespace-nowrap">
+          <i data-lucide="shopping-bag" class="w-4 h-4"></i>
+          <span>1. จัดการคำสั่งซื้อ</span>
+        </button>
+
+        <button onclick="switchTab('matrix')" id="tab-btn-matrix" class="tab-btn py-3.5 px-4 border-b-2 border-transparent text-gray-500 hover:text-gray-900 flex items-center space-x-2 whitespace-nowrap">
+          <i data-lucide="scissors" class="w-4 h-4"></i>
+          <span>2. สรุปยอดตัดเย็บโรงงาน</span>
+        </button>
+
+        <button onclick="switchTab('media')" id="tab-btn-media" class="tab-btn py-3.5 px-4 border-b-2 border-transparent text-gray-500 hover:text-gray-900 flex items-center space-x-2 whitespace-nowrap">
+          <i data-lucide="image" class="w-4 h-4"></i>
+          <span>3. รูปภาพ, เสียง & วิดีโอขอบคุณ</span>
+        </button>
+
+        <button onclick="switchTab('content')" id="tab-btn-content" class="tab-btn py-3.5 px-4 border-b-2 border-transparent text-gray-500 hover:text-gray-900 flex items-center space-x-2 whitespace-nowrap">
+          <i data-lucide="edit-3" class="w-4 h-4"></i>
+          <span>4. ข้อความหน้าเว็บ & ค่าจัดส่ง</span>
+        </button>
+
+        <button onclick="switchTab('settings')" id="tab-btn-settings" class="tab-btn py-3.5 px-4 border-b-2 border-transparent text-gray-500 hover:text-gray-900 flex items-center space-x-2 whitespace-nowrap">
+          <i data-lucide="credit-card" class="w-4 h-4"></i>
+          <span>5. ข้อมูลธนาคาร, PIN & ล้างข้อมูล</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
+
+      <!-- ================= TAB 1: ORDERS ================= -->
+      <section id="tab-orders" class="tab-content space-y-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-1">
+            <span class="text-xs text-gray-500 font-medium">ยอดสั่งจองรวมทั้งหมด</span>
+            <div id="stat-revenue" class="text-3xl font-display text-gray-900">฿0</div>
+            <span class="text-[11px] text-green-600 font-medium">คำนวณจากทุกออเดอร์</span>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-1">
+            <span class="text-xs text-gray-500 font-medium">จำนวนเสื้อทั้งหมด</span>
+            <div id="stat-shirts" class="text-3xl font-display text-orange-600">0 ตัว</div>
+            <span class="text-[11px] text-gray-500">ยอดที่ต้องสั่งผลิต</span>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-1">
+            <span class="text-xs text-gray-500 font-medium">รอตรวจสอบสลิป</span>
+            <div id="stat-pending" class="text-3xl font-display text-yellow-600">0</div>
+            <span class="text-[11px] text-yellow-600">ต้องตรวจยอดเงิน</span>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-1">
+            <span class="text-xs text-gray-500 font-medium">จัดส่งแล้ว</span>
+            <div id="stat-shipped" class="text-3xl font-display text-blue-600">0</div>
+            <span class="text-[11px] text-blue-600">มีเลขพัสดุแล้ว</span>
+          </div>
+        </div>
+
+        <!-- Orders Table -->
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="text-lg font-bold text-gray-900">รายการคำสั่งซื้อทั้งหมด</h3>
+              <p class="text-xs text-gray-500">ตรวจสลิป เปลี่ยนสถานะ ใส่เลขพัสดุ และพิมพ์ใบปะหน้า 100x150มม.</p>
+            </div>
+            <div class="flex items-center space-x-2">
+              <button onclick="exportToCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center space-x-1.5 transition shadow-sm">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                <span>ส่งออก CSV (ขนส่ง)</span>
+              </button>
+              <button onclick="loadAdminData()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs px-3 py-2 rounded-xl transition">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-2">
+            <div class="sm:col-span-8 relative">
+              <input type="text" id="filter-search" oninput="applyFilter()" placeholder="ค้นหาด้วยชื่อผู้รับ, เบอร์โทร หรือเลขออเดอร์..." class="w-full bg-gray-50 border border-gray-300 rounded-xl pl-10 pr-4 py-2.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500">
+              <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3"></i>
+            </div>
+            <div class="sm:col-span-4">
+              <select id="filter-status" onchange="applyFilter()" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                <option value="ALL">สถานะทั้งหมด</option>
+                <option value="pending_slip">รอตรวจสลิป</option>
+                <option value="verified">ตรวจสลิปแล้ว</option>
+                <option value="in_production">กำลังผลิต</option>
+                <option value="shipped">จัดส่งแล้ว</option>
+                <option value="cancelled">ยกเลิก</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div class="overflow-x-auto border border-gray-200 rounded-xl">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead class="bg-gray-50 text-gray-600 uppercase border-b border-gray-200 font-semibold">
+                <tr>
+                  <th class="py-3 px-3">เลขออเดอร์</th>
+                  <th class="py-3 px-3">ผู้สั่ง / เบอร์โทร</th>
+                  <th class="py-3 px-3">รายการเสื้อ</th>
+                  <th class="py-3 px-3">ยอดชำระ</th>
+                  <th class="py-3 px-3">สลิป</th>
+                  <th class="py-3 px-3">สถานะ</th>
+                  <th class="py-3 px-3">เลขพัสดุ</th>
+                  <th class="py-3 px-3 text-right">จัดการคำสั่งซื้อ</th>
+                </tr>
+              </thead>
+              <tbody id="orders-table-body" class="divide-y divide-gray-200 text-gray-800"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 2: PRODUCTION MATRIX ================= -->
+      <section id="tab-matrix" class="tab-content hidden space-y-6">
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 pb-4">
+            <div>
+              <h3 class="text-lg font-bold text-gray-900 flex items-center space-x-2">
+                <i data-lucide="scissors" class="w-5 h-5 text-orange-600"></i>
+                <span>สรุปยอดผลิตแยกสีและไซส์ (PRODUCTION MATRIX)</span>
+              </h3>
+              <p class="text-xs text-gray-500 mt-0.5">ใช้ส่งให้โรงงานเพื่อสั่งตัดเย็บผ้าตามยอดจองจริง</p>
+            </div>
+            <button onclick="copyFactorySummary()" class="bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition flex items-center space-x-1.5 shadow-sm">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>คัดลอกสรุปส่งไลน์โรงงาน</span>
+            </button>
+          </div>
+
+          <div class="overflow-x-auto border border-gray-200 rounded-xl">
+            <table class="w-full text-xs text-center border-collapse">
+              <thead class="bg-gray-50 text-gray-600 uppercase border-b border-gray-200 font-semibold">
+                <tr>
+                  <th class="py-3 px-4 text-left">สีเสื้อ / ไซส์</th>
+                  <th class="py-3 px-3">S (40")</th>
+                  <th class="py-3 px-3">M (42")</th>
+                  <th class="py-3 px-3">L (44")</th>
+                  <th class="py-3 px-3">XL (48")</th>
+                  <th class="py-3 px-3">2XL (52")</th>
+                  <th class="py-3 px-3">3XL (56")</th>
+                  <th class="py-3 px-4 font-bold bg-gray-100 text-gray-900">รวมสีนี้</th>
+                </tr>
+              </thead>
+              <tbody id="matrix-body" class="divide-y divide-gray-200 text-gray-800 font-mono text-sm"></tbody>
+              <tfoot>
+                <tr class="bg-orange-50 border-t-2 border-orange-600 font-bold text-gray-900 text-sm">
+                  <td class="py-3.5 px-4 text-left">รวมทุกไซส์</td>
+                  <td id="m-tot-s" class="py-3 px-3">0</td>
+                  <td id="m-tot-m" class="py-3 px-3">0</td>
+                  <td id="m-tot-l" class="py-3 px-3">0</td>
+                  <td id="m-tot-xl" class="py-3 px-3">0</td>
+                  <td id="m-tot-2xl" class="py-3 px-3">0</td>
+                  <td id="m-tot-3xl" class="py-3 px-3">0</td>
+                  <td id="m-grand-tot" class="py-3.5 px-4 bg-orange-600 text-white font-black text-base">0 ตัว</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 3: MEDIA, AUDIO & VIDEO ================= -->
+      <section id="tab-media" class="tab-content hidden space-y-6">
+        
+        <!-- 1. ภาพรวมเสื้อทั้งคอลเลกชัน -->
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <div>
+            <h3 class="text-base font-bold text-gray-900 flex items-center space-x-2">
+              <i data-lucide="layout" class="w-5 h-5 text-orange-600"></i>
+              <span>ภาพรวมคอลเลกชันเสื้อ (Collection Overview Banner)</span>
+            </h3>
+            <p class="text-xs text-gray-500 mt-0.5">ภาพโชว์ภาพรวมเสื้อทั้งสีดำและสีขาว สามารถเลือกอัปโหลดไฟล์จากเครื่อง หรือวางลิงก์รูปภาพได้</p>
+          </div>
+
+          <div class="border border-gray-200 rounded-2xl p-5 bg-gray-50 space-y-4">
+            <div class="flex flex-col sm:flex-row items-center gap-6">
+              <div class="w-full sm:w-72 h-40 bg-white rounded-xl border border-gray-200 overflow-hidden flex items-center justify-center p-1">
+                <img id="prev-overview-img" src="" alt="Overview" class="w-full h-full object-contain rounded-lg">
+              </div>
+              <div class="space-y-3 flex-grow text-center sm:text-left">
+                <span class="text-xs font-bold text-gray-700 block">วิธีที่ 1: อัปโหลดไฟล์จากคอมพิวเตอร์ / โทรศัพท์</span>
+                <label class="inline-block bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 px-6 rounded-xl text-xs cursor-pointer transition shadow-sm">
+                  เลือกรูปภาพภาพรวม
+                  <input type="file" accept="image/*" onchange="uploadOverviewImage(event)" class="hidden">
+                </label>
+                <div id="overview-upload-status" class="text-xs font-semibold text-emerald-600 hidden">✓ อัปโหลดภาพรวมสำเร็จแล้ว</div>
+              </div>
+            </div>
+
+            <!-- วิธีที่ 2: วางลิงก์รูปภาพ -->
+            <div class="pt-3 border-t border-gray-200 text-xs space-y-2">
+              <span class="font-bold text-gray-700 block">วิธีที่ 2: หรือวางลิงก์รูปภาพ (Image URL)</span>
+              <div class="flex gap-2">
+                <input type="text" id="input-overview-url" placeholder="เช่น https://example.com/my-banner.jpg" class="flex-grow bg-white border border-gray-300 rounded-xl px-3 py-2 text-gray-900 font-mono">
+                <button onclick="saveOverviewUrl()" class="bg-gray-800 hover:bg-black text-white font-bold px-4 py-2 rounded-xl transition">
+                  ใช้ลิงก์นี้
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. ภาพเสื้อจริง 4 มุมมอง -->
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <div>
+            <h3 class="text-base font-bold text-gray-900 flex items-center space-x-2">
+              <i data-lucide="image" class="w-5 h-5 text-orange-600"></i>
+              <span>ภาพเสื้อจริงสำหรับหน้าเว็บ</span>
+            </h3>
+            <p class="text-xs text-gray-500 mt-0.5">ระบบจะปรับขนาดภาพให้อัตโนมัติ เพื่อให้โหลดเร็วและไม่กินพื้นที่ความจำ</p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- ดำ หน้า -->
+            <div class="border border-gray-200 rounded-2xl p-4 space-y-3 bg-gray-50 text-center">
+              <span class="text-xs font-bold text-gray-800 block">🖤 สีดำ (ด้านหน้า)</span>
+              <div class="aspect-square bg-white rounded-xl border border-gray-200 overflow-hidden flex items-center justify-center p-2 relative group">
+                <img id="prev-black-front" src="" alt="Black Front" class="max-h-full max-w-full object-contain">
+                <label class="absolute inset-0 bg-black/50 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer text-xs font-bold space-y-1">
+                  <i data-lucide="upload" class="w-6 h-6"></i>
+                  <span>เปลี่ยนรูป</span>
+                  <input type="file" accept="image/*" onchange="uploadProductImage(event, 'blackFront')" class="hidden">
+                </label>
+              </div>
+              <label class="block w-full bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 py-2 rounded-xl text-xs font-bold cursor-pointer transition">
+                เลือกรูปภาพ
+                <input type="file" accept="image/*" onchange="uploadProductImage(event, 'blackFront')" class="hidden">
+              </label>
+            </div>
+
+            <!-- ดำ หลัง -->
+            <div class="border border-gray-200 rounded-2xl p-4 space-y-3 bg-gray-50 text-center">
+              <span class="text-xs font-bold text-gray-800 block">🖤 สีดำ (ด้านหลัง)</span>
+              <div class="aspect-square bg-white rounded-xl border border-gray-200 overflow-hidden flex items-center justify-center p-2 relative group">
+                <img id="prev-black-back" src="" alt="Black Back" class="max-h-full max-w-full object-contain">
+                <label class="absolute inset-0 bg-black/50 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer text-xs font-bold space-y-1">
+                  <i data-lucide="upload" class="w-6 h-6"></i>
+                  <span>เปลี่ยนรูป</span>
+                  <input type="file" accept="image/*" onchange="uploadProductImage(event, 'blackBack')" class="hidden">
+                </label>
+              </div>
+              <label class="block w-full bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 py-2 rounded-xl text-xs font-bold cursor-pointer transition">
+                เลือกรูปภาพ
+                <input type="file" accept="image/*" onchange="uploadProductImage(event, 'blackBack')" class="hidden">
+              </label>
+            </div>
+
+            <!-- ขาว หน้า -->
+            <div class="border border-gray-200 rounded-2xl p-4 space-y-3 bg-gray-50 text-center">
+              <span class="text-xs font-bold text-gray-800 block">🤍 สีขาว (ด้านหน้า)</span>
+              <div class="aspect-square bg-white rounded-xl border border-gray-200 overflow-hidden flex items-center justify-center p-2 relative group">
+                <img id="prev-white-front" src="" alt="White Front" class="max-h-full max-w-full object-contain">
+                <label class="absolute inset-0 bg-black/50 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer text-xs font-bold space-y-1">
+                  <i data-lucide="upload" class="w-6 h-6"></i>
+                  <span>เปลี่ยนรูป</span>
+                  <input type="file" accept="image/*" onchange="uploadProductImage(event, 'whiteFront')" class="hidden">
+                </label>
+              </div>
+              <label class="block w-full bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 py-2 rounded-xl text-xs font-bold cursor-pointer transition">
+                เลือกรูปภาพ
+                <input type="file" accept="image/*" onchange="uploadProductImage(event, 'whiteFront')" class="hidden">
+              </label>
+            </div>
+
+            <!-- ขาว หลัง -->
+            <div class="border border-gray-200 rounded-2xl p-4 space-y-3 bg-gray-50 text-center">
+              <span class="text-xs font-bold text-gray-800 block">🤍 สีขาว (ด้านหลัง)</span>
+              <div class="aspect-square bg-white rounded-xl border border-gray-200 overflow-hidden flex items-center justify-center p-2 relative group">
+                <img id="prev-white-back" src="" alt="White Back" class="max-h-full max-w-full object-contain">
+                <label class="absolute inset-0 bg-black/50 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer text-xs font-bold space-y-1">
+                  <i data-lucide="upload" class="w-6 h-6"></i>
+                  <span>เปลี่ยนรูป</span>
+                  <input type="file" accept="image/*" onchange="uploadProductImage(event, 'whiteBack')" class="hidden">
+                </label>
+              </div>
+              <label class="block w-full bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 py-2 rounded-xl text-xs font-bold cursor-pointer transition">
+                เลือกรูปภาพ
+                <input type="file" accept="image/*" onchange="uploadProductImage(event, 'whiteBack')" class="hidden">
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. วิดีโอขอบคุณจาก เอ็ม ธวัชชัย (รองรับทั้งอัปโหลดไฟล์วิดีโอ และลิงก์ URL) -->
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <div>
+            <h3 class="text-base font-bold text-gray-900 flex items-center space-x-2">
+              <i data-lucide="video" class="w-5 h-5 text-orange-600"></i>
+              <span>วิดีโอขอบคุณจาก เอ็ม ธวัชชัย (Thank You Video)</span>
+            </h3>
+            <p class="text-xs text-gray-500 mt-0.5">วิดีโอนี้จะแสดงในหน้าบัตร Digital Pre-order Pass เมื่อลูกค้าจองสำเร็จ (สามารถอัปโหลดไฟล์วิดีโอตรงๆ หรือใส่ลิงก์ YouTube ได้)</p>
+          </div>
+
+          <div class="bg-gray-50 border border-gray-200 rounded-2xl p-5 space-y-4 text-xs">
+            <div class="flex items-center space-x-2">
+              <input type="checkbox" id="set-video-enable" class="w-4 h-4 text-orange-600 rounded">
+              <label for="set-video-enable" class="font-bold text-gray-800">เปิดแสดงวิดีโอขอบคุณในหน้าบัตรจอง</label>
+            </div>
+
+            <!-- ช่องทางที่ 1: อัปโหลดไฟล์วิดีโอ -->
+            <div class="bg-white p-4 rounded-xl border border-gray-200 space-y-3">
+              <span class="font-bold text-gray-800 block">📁 ช่องทางที่ 1: อัปโหลดไฟล์วิดีโอจากเครื่อง (MP4 / WebM / MOV)</span>
+              <div class="flex flex-col sm:flex-row items-center gap-3">
+                <label class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-5 rounded-xl cursor-pointer transition flex items-center space-x-1.5 shadow-sm">
+                  <i data-lucide="upload" class="w-4 h-4"></i>
+                  <span>เลือกไฟล์วิดีโอเพื่ออัปโหลด</span>
+                  <input type="file" id="video-file-input" accept="video/*" onchange="uploadVideoFile(event)" class="hidden">
+                </label>
+                <span id="video-upload-status" class="text-xs font-semibold text-emerald-600"></span>
+              </div>
+              <div id="video-preview-wrapper" class="hidden max-w-sm rounded-xl overflow-hidden border border-gray-200 aspect-video bg-black mt-2">
+                <video id="video-preview-tag" controls class="w-full h-full object-contain"></video>
+              </div>
+            </div>
+
+            <!-- ช่องทางที่ 2: วางลิงก์วิดีโอ -->
+            <div class="bg-white p-4 rounded-xl border border-gray-200 space-y-2">
+              <span class="font-bold text-gray-800 block">🔗 ช่องทางที่ 2: หรือวางลิงก์วิดีโอ (YouTube Embed URL หรือ ลิงก์คลิป MP4)</span>
+              <input type="text" id="set-video-url" placeholder="เช่น https://www.youtube.com/embed/xxxxxx" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-gray-900 font-mono">
+            </div>
+
+            <button onclick="saveVideoSettings()" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-sm">
+              บันทึกการตั้งค่าวิดีโอ
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. ไฟล์เสียงจริง -->
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <div>
+            <h3 class="text-base font-bold text-gray-900 flex items-center space-x-2">
+              <i data-lucide="volume-2" class="w-5 h-5 text-orange-600"></i>
+              <span>ไฟล์เสียงจริงของ "เอ็ม ธวัชชัย" (.mp3)</span>
+            </h3>
+            <p class="text-xs text-gray-500 mt-0.5">เล่นเมื่อลูกค้ากดปุ่มฟังเสียงที่หน้าเว็บ</p>
+          </div>
+
+          <div class="bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="space-y-1 text-center sm:text-left">
+              <span class="text-xs font-bold text-gray-800" id="audio-status-label">สถานะไฟล์เสียง: พร้อมใช้งาน</span>
+              <audio id="admin-audio-test" controls class="h-9 mt-2"></audio>
+            </div>
+            <div>
+              <label class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 px-5 rounded-xl text-xs cursor-pointer transition flex items-center space-x-2 shadow-sm">
+                <i data-lucide="upload" class="w-4 h-4"></i>
+                <span>อัปโหลดไฟล์เสียง MP3</span>
+                <input type="file" accept="audio/*" onchange="uploadAudioVoice(event)" class="hidden">
+              </label>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ================= TAB 4: CONTENT, HEADLINES & SHIPPING ================= -->
+      <section id="tab-content" class="tab-content hidden space-y-6">
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6 max-w-3xl">
+          <div>
+            <h3 class="text-base font-bold text-gray-900 flex items-center space-x-2">
+              <i data-lucide="edit-3" class="w-5 h-5 text-orange-600"></i>
+              <span>แก้ไขข้อความหน้าเว็บ, แถบประกาศ & ค่าจัดส่ง</span>
+            </h3>
+            <p class="text-xs text-gray-500 mt-0.5">แก้ไขได้ทุกจุดและแสดงผลที่หน้าเว็บทันที</p>
+          </div>
+
+          <div class="space-y-5 text-xs">
+            
+            <!-- 1. แถบประกาศบนสุด -->
+            <div class="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-gray-900 flex items-center space-x-1.5">
+                  <i data-lucide="bell" class="w-4 h-4 text-orange-600"></i>
+                  <span>แถบประกาศบนสุดของหน้าเว็บ (Top Notice Bar)</span>
+                </span>
+                <label class="flex items-center space-x-2 cursor-pointer">
+                  <input type="checkbox" id="edit-ticker-enabled" class="w-4 h-4 text-orange-600 rounded">
+                  <span class="text-gray-700 font-semibold">แสดงแถบนี้</span>
+                </label>
+              </div>
+              <input type="text" id="edit-ticker-text" placeholder="ข้อความแถบประกาศ" class="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500">
+            </div>
+
+            <!-- 2. ส่วนภาพรวมคอลเลกชัน (Overview Section Texts) -->
+            <div class="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-3">
+              <span class="font-bold text-gray-900 block">🖼️ ข้อความในส่วน "ภาพรวมคอลเลกชันเสื้อ"</span>
+              <div>
+                <label class="block font-bold text-gray-700 mb-1">หัวข้อส่วนภาพรวม:</label>
+                <input type="text" id="edit-overview-title" placeholder="เช่น ภาพรวมคอลเลกชันเสื้อ 'เอ็ม ธวัชชัย'" class="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 text-gray-900 font-bold">
+              </div>
+              <div>
+                <label class="block font-bold text-gray-700 mb-1">คำอธิบายใต้หัวข้อภาพรวม:</label>
+                <input type="text" id="edit-overview-desc" placeholder="เช่น ดีไซน์สตรีทแวร์ Oversized Unisex มีให้เลือก 2 สีคลาสสิก (ดำ Street Black & ขาว Pure White)" class="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 text-gray-900">
+              </div>
+            </div>
+
+            <!-- 3. ป้ายแท็กและหัวข้อหลัก -->
+            <div class="bg-orange-50/40 p-4 rounded-2xl border border-orange-200 space-y-3">
+              <span class="font-bold text-gray-900 block">🏷️ ข้อความป้ายแท็กและหัวเรื่องสินค้า</span>
+              <div>
+                <label class="block font-bold text-gray-700 mb-1">ข้อความป้ายแท็ก (Badge Tag):</label>
+                <input type="text" id="edit-badge-text" placeholder="เช่น ผลิตตามยอดสั่งจองพรีออเดอร์เท่านั้น" class="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 text-gray-900">
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block font-bold text-gray-700 mb-1">หัวข้อหลัก บรรทัดที่ 1:</label>
+                  <input type="text" id="edit-headline-1" placeholder="เช่น THE RESILIENCE" class="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 text-gray-900 font-bold">
+                </div>
+                <div>
+                  <label class="block font-bold text-gray-700 mb-1">หัวข้อหลัก บรรทัดที่ 2 (ชื่อ):</label>
+                  <input type="text" id="edit-headline-2" placeholder="เช่น เอ็ม ธวัชชัย" class="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 text-orange-600 font-bold">
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. ข้อความใต้ภาพเสื้อ (Sub-image Text) -->
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">ข้อความใต้ภาพเสื้อที่แสดง (เช่น ชนิดผ้า / GSM):</label>
+              <input type="text" id="edit-fabric-tag" placeholder="เช่น ผ้าพรีเมียม Heavy Cotton 260 GSM" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-gray-900">
+            </div>
+
+            <!-- 5. คำอธิบายใต้หัวข้อฟอร์มสั่งจอง -->
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">คำอธิบายใต้หัวข้อแบบฟอร์มลงทะเบียนสั่งจอง:</label>
+              <input type="text" id="edit-form-subtitle" placeholder="เช่น เลือกสีและไซส์ด้วยปุ่มขนาดใหญ่ (ระบบจดจำข้อมูลขณะสลับไปโอนเงิน ไม่ต้องพิมพ์ใหม่)" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-gray-900">
+            </div>
+
+            <!-- 6. ชื่อคอลเลกชัน & เรื่องราว -->
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">ชื่อคอลเลกชัน / ชื่อสินค้า:</label>
+              <input type="text" id="edit-prod-name" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500">
+            </div>
+
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">คำบรรยาย / เรื่องราวของเอ็ม ธวัชชัย:</label>
+              <textarea id="edit-prod-desc" rows="3" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+            </div>
+
+            <!-- 7. ราคา & ค่าจัดส่ง -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block font-bold text-gray-700 mb-1">ราคา Pre-Order ต่อตัว (บาท):</label>
+                <input type="number" id="edit-price" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-orange-500">
+              </div>
+              <div>
+                <label class="block font-bold text-gray-700 mb-1">ราคาเต็มก่อนลด (บาท):</label>
+                <input type="number" id="edit-orig-price" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-orange-500">
+              </div>
+            </div>
+
+            <!-- การตั้งค่าจัดส่ง -->
+            <div class="bg-orange-50/50 p-4 rounded-2xl border border-orange-200 space-y-3">
+              <span class="font-bold text-gray-900 block flex items-center space-x-1.5">
+                <i data-lucide="truck" class="w-4 h-4 text-orange-600"></i>
+                <span>การตั้งค่าจัดส่ง & โปรโมชั่นส่งฟรี</span>
+              </span>
+
+              <div class="flex items-center space-x-3 bg-white p-3 rounded-xl border border-orange-200">
+                <input type="checkbox" id="edit-free-ship-all" onchange="toggleFreeShipAll(this.checked)" class="w-4 h-4 text-orange-600 rounded">
+                <label for="edit-free-ship-all" class="font-bold text-orange-800 cursor-pointer">
+                  🎉 เปิดโหมด "ฟรีค่าจัดส่งทุกออเดอร์" (ไม่คิดค่าส่งเลย)
+                </label>
+              </div>
+
+              <div id="shipping-fee-inputs" class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <div>
+                  <label class="block font-bold text-gray-700 mb-1">ค่าจัดส่งปกติ (บาท):</label>
+                  <input type="number" id="edit-shipping" class="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-orange-500">
+                </div>
+                <div>
+                  <label class="block font-bold text-gray-700 mb-1">สั่งครบกี่ตัวขึ้นไปส่งฟรี:</label>
+                  <input type="number" id="edit-free-ship-qty" class="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-orange-500">
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-4 border-t border-gray-200">
+              <button onclick="saveWebsiteContent()" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-8 rounded-xl text-xs transition shadow-sm">
+                บันทึกการตั้งค่าทั้งหมด
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 5: BANK, PIN & RESET ================= -->
+      <section id="tab-settings" class="tab-content hidden space-y-6">
+
+        <!-- SUPABASE CLOUD CONNECTION CARD -->
+        <div class="bg-gradient-to-r from-emerald-50 via-white to-emerald-50/50 rounded-2xl border-2 border-emerald-300 shadow-sm p-6 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200 pb-3">
+            <div>
+              <h3 class="text-base font-bold text-gray-900 flex items-center space-x-2">
+                <i data-lucide="cloud" class="w-5 h-5 text-emerald-600"></i>
+                <span>เชื่อมต่อฐานข้อมูล Supabase Cloud (ข้อมูลลิ้งค์กันทุกเครื่อง/มือถือ)</span>
+              </h3>
+              <p class="text-xs text-gray-600 mt-0.5">
+                เมื่อเชื่อมต่อแล้ว ไม่ว่าจะเปิดแอดมินจากคอมพิวเตอร์หรือมือถือเครื่องไหน ข้อมูลคำสั่งซื้อ ยอดเงิน และการแก้ไขจะตรงกันแบบเรียลไทม์
+              </p>
+            </div>
+            <div id="cfg-db-status-pill" class="text-xs font-bold px-3 py-1 rounded-full bg-gray-200 text-gray-700 self-start sm:self-auto">
+              สถานะ: ตรวจสอบ...
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">Supabase Project URL:</label>
+              <input type="text" id="set-sb-url" placeholder="https://xxxxxxxx.supabase.co" class="w-full bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 font-mono">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">Supabase Anon Public Key:</label>
+              <input type="password" id="set-sb-key" placeholder="eyJh..." class="w-full bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 font-mono">
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3 pt-1">
+            <button onclick="testSupabaseFromAdmin()" class="bg-gray-800 hover:bg-black text-white font-bold py-2.5 px-5 rounded-xl text-xs transition flex items-center space-x-1.5 shadow-sm">
+              <i data-lucide="activity" class="w-3.5 h-3.5"></i>
+              <span>ทดสอบการเชื่อมต่อ (Test Connection)</span>
+            </button>
+            <button onclick="saveSupabaseSettings()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-6 rounded-xl text-xs transition shadow-sm flex items-center space-x-1.5">
+              <i data-lucide="save" class="w-3.5 h-3.5"></i>
+              <span>บันทึกการเชื่อมต่อ Cloud</span>
+            </button>
+            <button onclick="disconnectSupabase()" class="text-gray-500 hover:text-red-600 text-xs py-2 px-3 transition">
+              สลับใช้ LocalStorage แบบออฟไลน์
+            </button>
+          </div>
+          <div id="sb-test-result" class="text-xs hidden"></div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Bank & QR -->
+          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+            <h3 class="text-base font-bold text-gray-900 flex items-center space-x-2">
+              <i data-lucide="credit-card" class="w-5 h-5 text-emerald-600"></i>
+              <span>บัญชีธนาคาร & รูปภาพ QR Code</span>
+            </h3>
+
+            <div class="space-y-3 text-xs">
+              <div>
+                <label class="block font-bold text-gray-700 mb-1">ชื่อธนาคาร:</label>
+                <input type="text" id="set-bank-name" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-gray-900">
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block font-bold text-gray-700 mb-1">เลขที่บัญชี:</label>
+                  <input type="text" id="set-bank-acc" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-gray-900 font-mono">
+                </div>
+                <div>
+                  <label class="block font-bold text-gray-700 mb-1">เบอร์พร้อมเพย์:</label>
+                  <input type="text" id="set-promptpay" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-gray-900 font-mono">
+                </div>
+              </div>
+              <div>
+                <label class="block font-bold text-gray-700 mb-1">ชื่อบัญชี:</label>
+                <input type="text" id="set-bank-holder" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-gray-900">
+              </div>
+
+              <!-- Custom QR Image -->
+              <div class="pt-2 border-t border-gray-200">
+                <label class="block font-bold text-gray-700 mb-1">ภาพ QR Code สแกนจ่าย (ถ้ามี):</label>
+                <div class="flex items-center space-x-4">
+                  <div class="w-20 h-20 bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex items-center justify-center">
+                    <img id="prev-qr-code" src="" alt="QR" class="w-full h-full object-contain">
+                  </div>
+                  <label class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-3 py-2 rounded-xl text-xs cursor-pointer transition">
+                    อัปโหลดรูปภาพ QR
+                    <input type="file" accept="image/*" onchange="uploadQrImage(event)" class="hidden">
+                  </label>
+                </div>
+              </div>
+
+              <div class="pt-2">
+                <button onclick="saveBankDetails()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-sm">
+                  บันทึกข้อมูลธนาคาร
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- PIN & Reset Data -->
+          <div class="space-y-6">
+            
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+              <h3 class="text-base font-bold text-gray-900 flex items-center space-x-2">
+                <i data-lucide="lock" class="w-5 h-5 text-orange-600"></i>
+                <span>เปลี่ยนรหัส PIN แอดมิน</span>
+              </h3>
+
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="block font-bold text-gray-700 mb-1">รหัส PIN ปัจจุบัน:</label>
+                  <input type="password" id="set-old-pin" placeholder="รหัสเดิม (เริ่มต้น: 1234)" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-gray-900 font-mono">
+                </div>
+                <div>
+                  <label class="block font-bold text-gray-700 mb-1">รหัส PIN ใหม่:</label>
+                  <input type="password" id="set-new-pin" placeholder="ตั้งรหัสใหม่ 4-10 หลัก" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-gray-900 font-mono">
+                </div>
+                <div class="pt-2">
+                  <button onclick="saveNewAdminPin()" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-sm">
+                    บันทึกรหัส PIN ใหม่
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- DANGER ZONE: CLEAR ALL ORDERS -->
+            <div class="bg-red-50 border-2 border-red-200 rounded-2xl p-6 space-y-3">
+              <div class="flex items-center space-x-2 text-red-700">
+                <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                <h3 class="text-sm font-bold uppercase">ล้างข้อมูลคำสั่งซื้อทั้งหมด (ก่อนเปิดจองจริง)</h3>
+              </div>
+              <p class="text-xs text-red-600 leading-relaxed">
+                ใช้สำหรับลบออเดอร์ทดสอบทั้งหมด เพื่อเตรียมเปิดรับพรีออเดอร์จริงของแฟนคลับ 
+                <strong>* ระบบจะให้ยืนยันรหัส PIN แอดมินก่อนลบทุกครั้ง เพื่อป้องกันการกดพลาด</strong>
+              </p>
+              <button onclick="confirmResetAllOrders()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-5 rounded-xl text-xs transition shadow-sm flex items-center space-x-1.5">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                <span>ล้างข้อมูลออเดอร์ทั้งหมด (ต้องใส่รหัส PIN)</span>
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ================= EDIT ORDER MODAL ================= -->
+  <div id="edit-order-modal" class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="bg-white border border-gray-200 max-w-2xl w-full rounded-3xl p-6 sm:p-8 space-y-6 relative shadow-2xl my-auto">
+      <div class="flex items-center justify-between border-b border-gray-100 pb-4">
+        <div>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-orange-600 block">EDIT PRE-ORDER</span>
+          <h3 class="text-xl font-bold text-gray-900">แก้ไขรายละเอียดคำสั่งซื้อ</h3>
+          <span id="edit-modal-order-num" class="font-mono text-sm text-gray-500 font-bold">MTC-2026-0001</span>
+        </div>
+        <button onclick="closeEditOrderModal()" class="text-gray-400 hover:text-gray-900 p-2 rounded-full hover:bg-gray-100 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <input type="hidden" id="edit-modal-order-id">
+
+      <div class="space-y-4 text-xs max-h-[70vh] overflow-y-auto pr-1">
+        <!-- 1. Customer Details -->
+        <div class="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-3">
+          <span class="font-bold text-gray-800 block text-sm">👤 ข้อมูลผู้สั่งจอง</span>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">ชื่อ - นามสกุล:</label>
+              <input type="text" id="edit-cust-name" class="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-gray-900">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">เบอร์โทรศัพท์:</label>
+              <input type="tel" id="edit-cust-phone" class="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-gray-900 font-mono">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">ช่องทางติดต่อสำรอง (Line/IG):</label>
+              <input type="text" id="edit-cust-contact" class="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-gray-900">
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Address Details -->
+        <div class="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-3">
+          <span class="font-bold text-gray-800 block text-sm">📍 ที่อยู่จัดส่ง</span>
+          <div class="space-y-3">
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">บ้านเลขที่ / ซอย / ถนน / อาคาร:</label>
+              <input type="text" id="edit-addr-detail" class="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-gray-900">
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div>
+                <label class="block font-bold text-gray-700 mb-1">ตำบล / แขวง:</label>
+                <input type="text" id="edit-addr-sub" class="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-gray-900">
+              </div>
+              <div>
+                <label class="block font-bold text-gray-700 mb-1">อำเภอ / เขต:</label>
+                <input type="text" id="edit-addr-dist" class="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-gray-900">
+              </div>
+              <div>
+                <label class="block font-bold text-gray-700 mb-1">จังหวัด:</label>
+                <input type="text" id="edit-addr-prov" class="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-gray-900">
+              </div>
+              <div>
+                <label class="block font-bold text-gray-700 mb-1">รหัสไปรษณีย์:</label>
+                <input type="text" id="edit-addr-postal" class="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-gray-900 font-mono">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Shirts and Sizes (รายการเสื้อในออเดอร์) -->
+        <div class="bg-orange-50/50 p-4 rounded-2xl border border-orange-200 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-gray-900 block text-sm">👕 รายการเสื้อที่สั่ง (สามารถเปลี่ยนสี, ไซส์ หรือจำนวนได้)</span>
+            <button type="button" onclick="addModalItemRow()" class="text-orange-600 hover:text-orange-700 bg-white border border-orange-300 font-bold px-3 py-1 rounded-xl transition text-[11px] shadow-sm">
+              + เพิ่มเสื้ออีกตัว
+            </button>
+          </div>
+
+          <div id="modal-items-container" class="space-y-2">
+            <!-- Dynamic item rows in modal -->
+          </div>
+
+          <div class="flex items-center justify-between border-t border-orange-200 pt-2 font-bold text-gray-800">
+            <span>รวมทั้งหมด: <span id="modal-total-qty" class="text-orange-600">0</span> ตัว</span>
+            <span>ยอดชำระ: <span id="modal-total-price" class="text-orange-600 font-mono">฿0</span></span>
+          </div>
+        </div>
+
+        <!-- 4. Status, Courier & Tracking -->
+        <div class="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-3">
+          <span class="font-bold text-gray-800 block text-sm">🚚 สถานะคำสั่งซื้อ & เลขพัสดุ</span>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">สถานะออเดอร์:</label>
+              <select id="edit-order-status" class="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-gray-900 font-bold">
+                <option value="pending_slip">รอตรวจสลิป</option>
+                <option value="verified">ตรวจสลิปแล้ว (พร้อมตัดเย็บ)</option>
+                <option value="in_production">กำลังตัดเย็บผลิต</option>
+                <option value="shipped">จัดส่งพัสดุแล้ว</option>
+                <option value="cancelled">❌ ยกเลิกคำสั่งซื้อ</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">บริษัทขนส่ง:</label>
+              <input type="text" id="edit-courier-name" value="Flash Express" class="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-gray-900">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">เลขพัสดุ (Tracking No.):</label>
+              <input type="text" id="edit-tracking-num" placeholder="เช่น TH01234567" class="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-gray-900 font-mono">
+            </div>
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">หมายเหตุภายในของทีมงาน (Admin Notes):</label>
+            <input type="text" id="edit-admin-notes" placeholder="เช่น ลูกค้าขอเปลี่ยนไซส์ L เป็น XL ทาง LINE เมื่อ 18 ต.ค." class="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-gray-900">
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Buttons -->
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-100">
+        <div class="flex items-center space-x-2 w-full sm:w-auto">
+          <button type="button" onclick="cancelCurrentOrder()" class="text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3.5 py-2.5 rounded-xl font-bold transition">
+            ❌ ยกเลิกออเดอร์นี้
+          </button>
+          <button type="button" onclick="deleteCurrentOrderPermanently()" class="text-xs text-gray-400 hover:text-red-600 py-2.5 px-3 transition">
+            ลบออเดอร์ถาวร
+          </button>
+        </div>
+
+        <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+          <button type="button" onclick="closeEditOrderModal()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 px-5 rounded-xl text-xs transition">
+            ปิด
+          </button>
+          <button type="button" id="btn-save-order-edit" onclick="saveOrderEdit()" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 px-7 rounded-xl text-xs transition shadow-sm flex items-center space-x-1.5">
+            <i data-lucide="save" class="w-4 h-4"></i>
+            <span>บันทึกการแก้ไข</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= SLIP VIEW MODAL ================= -->
+  <div id="slip-modal" class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white border border-gray-200 max-w-md w-full rounded-3xl p-6 space-y-4 relative shadow-2xl">
+      <button onclick="closeSlipModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-900 p-2">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      <h4 class="text-base font-bold text-gray-900">ตรวจสอบสลิปการโอนเงิน</h4>
+      <div class="border border-gray-200 rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center max-h-[65vh]">
+        <img id="slip-modal-img" src="" alt="Slip" class="max-h-[60vh] w-auto object-contain">
+      </div>
+      <div class="flex items-center justify-between gap-3 pt-2">
+        <button id="slip-confirm-btn" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition flex items-center justify-center space-x-1 shadow-sm">
+          <i data-lucide="check" class="w-4 h-4"></i>
+          <span>อนุมัติสลิปนี้</span>
+        </button>
+        <button onclick="closeSlipModal()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 px-4 rounded-xl text-xs transition">
+          ปิด
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= THERMAL LABEL PRINT AREA (100x150 mm) ================= -->
+  <div id="print-thermal-area" class="hidden">
+    <div style="border: 2px solid #000; padding: 10px; font-family: 'Prompt', sans-serif; font-size: 11px; color: #000; height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 8px;">
+          <div>
+            <span style="font-size: 18px; font-weight: 900; letter-spacing: 1px;">M THAWATCHAI</span>
+            <div style="font-size: 9px;">PRE-ORDER OFFICIAL COURIER</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 13px; font-weight: bold;">FLASH EXPRESS</div>
+            <div style="font-size: 9px;">STD DELIVERY</div>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 10px;">
+          <svg id="barcode-canvas" style="max-height: 48px; width: 100%;"></svg>
+          <div style="font-family: monospace; font-size: 12px; font-weight: bold;" id="lbl-order-id">MTC-2026-0001</div>
+        </div>
+
+        <div style="border-top: 1px solid #000; padding-top: 6px; margin-bottom: 8px;">
+          <div style="font-size: 9px; font-weight: bold; color: #555;">ผู้ส่ง (SENDER):</div>
+          <div style="font-size: 10px; font-weight: bold;">เอ็ม ธวัชชัย (M Thawatchai Official) 081-234-5678</div>
+          <div style="font-size: 9px; line-height: 1.2;">เลขที่ 99/9 อาคารสตรีทเฮาส์ สุขุมวิท คลองเตย กทม. 10110</div>
+        </div>
+
+        <div style="border-top: 2px solid #000; padding-top: 8px; margin-bottom: 8px;">
+          <div style="font-size: 10px; font-weight: bold; color: #000;">ผู้รับ (RECIPIENT):</div>
+          <div style="font-size: 15px; font-weight: 900;" id="lbl-recipient-name">นายสมชาย ใจสู้</div>
+          <div style="font-size: 13px; font-weight: bold; font-family: monospace;" id="lbl-recipient-phone">089-123-4567</div>
+          <div style="font-size: 12px; line-height: 1.3; margin-top: 4px;" id="lbl-recipient-address">
+            88/12 หมู่ 4 ซอยอารีย์ แขวงพญาไท เขตพญาไท กรุงเทพมหานคร
+          </div>
+          <div style="font-size: 26px; font-weight: 900; font-family: monospace; margin-top: 4px; text-align: right;" id="lbl-recipient-postal">
+            10400
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top: 2px dashed #000; padding-top: 8px; margin-top: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+          <span style="font-size: 11px; font-weight: bold; background: #000; color: #fff; padding: 2px 6px;">
+            รายการของที่ต้องแพ็ค (PACKING SLIP)
+          </span>
+          <span style="font-size: 10px; font-weight: bold;" id="lbl-pack-qty">รวม 2 ตัว</span>
+        </div>
+        <div id="lbl-packing-items" style="font-size: 16px; font-weight: 900; font-family: monospace; margin-top: 6px; line-height: 1.4; color: #000;">
+          [ดำ-L x 1] [ขาว-XL x 1]
+        </div>
+        <div style="font-size: 8px; color: #444; margin-top: 4px;">
+          * ทีมงานหยิบเสื้อตามรายการข้างต้นใส่ซองพัสดุได้ทันทีโดยไม่ต้องเปิดคอมเทียบ
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="db.js"></script>
+  <script>
+    let allOrders = [];
+
+    const DEFAULT_SHIRT_PHOTOS = {
+      overview: "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=1200&q=80",
+      blackFront: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      blackBack: "https://images.unsplash.com/photo-1618354691373-d851c5c3a990?auto=format&fit=crop&w=800&q=80",
+      whiteFront: "https://images.unsplash.com/photo-1581655353564-df123a1eb820?auto=format&fit=crop&w=800&q=80",
+      whiteBack: "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?auto=format&fit=crop&w=800&q=80"
+    };
+
+    // Helper: Compress Image
+    function compressImageFile(file, maxWidth, quality, callback) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+          callback(compressedBase64);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // ================= INDEXEDDB FOR LARGE VIDEO STORAGE =================
+    const DB_NAME = "MTC_MEDIA_STORAGE";
+    const STORE_NAME = "media_files";
+
+    function openMediaDB(callback) {
+      const request = indexedDB.open(DB_NAME, 1);
+      request.onupgradeneeded = function(e) {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME);
+        }
+      };
+      request.onsuccess = function(e) { callback(e.target.result); };
+      request.onerror = function() { callback(null); };
+    }
+
+    function saveVideoToDB(blob, callback) {
+      openMediaDB(function(db) {
+        if (!db) return callback(false);
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        store.put(blob, "thank_you_video");
+        tx.oncomplete = function() { callback(true); };
+        tx.onerror = function() { callback(false); };
+      });
+    }
+
+    function getVideoFromDB(callback) {
+      openMediaDB(function(db) {
+        if (!db) return callback(null);
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.get("thank_you_video");
+        req.onsuccess = function() { callback(req.result); };
+        req.onerror = function() { callback(null); };
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      if (sessionStorage.getItem('MTC_ADMIN_AUTH') === 'true') {
+        showApp();
+      }
+    });
+
+    // ================= TABS =================
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('border-orange-600', 'text-orange-600');
+        btn.classList.add('border-transparent', 'text-gray-500');
+      });
+
+      const target = document.getElementById(`tab-${tabId}`);
+      const btn = document.getElementById(`tab-btn-${tabId}`);
+      if (target) target.classList.remove('hidden');
+      if (btn) {
+        btn.classList.add('border-orange-600', 'text-orange-600');
+        btn.classList.remove('border-transparent', 'text-gray-500');
+      }
+
+      if (tabId === 'matrix') renderMatrix();
+      if (tabId === 'media') loadMediaPreviews();
+      if (tabId === 'content') loadContentForm();
+      if (tabId === 'settings') loadSettingsForm();
+    }
+
+    // ================= AUTH =================
+    function getAdminPin() {
+      return localStorage.getItem('MTC_CUSTOM_PIN') || APP_CONFIG.admin.defaultPin;
+    }
+
+    function handleLogin(event) {
+      event.preventDefault();
+      const enteredPin = document.getElementById('input-pin').value.trim();
+      if (enteredPin === getAdminPin()) {
+        sessionStorage.setItem('MTC_ADMIN_AUTH', 'true');
+        showApp();
+      } else {
+        alert('รหัส PIN ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
+      }
+    }
+
+    function handleLogout() {
+      sessionStorage.removeItem('MTC_ADMIN_AUTH');
+      window.location.reload();
+    }
+
+    async function showApp() {
+      document.getElementById('login-modal').classList.add('hidden');
+      document.getElementById('admin-app').classList.remove('hidden');
+      updateDbStatusPill();
+      await loadAdminData();
+      loadMediaPreviews();
+      loadContentForm();
+      loadSettingsForm();
+    }
+
+    // ================= ORDERS & METRICS =================
+    async function loadAdminData() {
+      updateDbStatusPill();
+      try {
+        allOrders = await DB.getOrders();
+      } catch(e) {
+        console.warn('Failed to load orders:', e);
+        try {
+          allOrders = JSON.parse(localStorage.getItem('MTC_ORDERS') || '[]');
+        } catch(err) { allOrders = []; }
+      }
+
+      updateStats();
+      renderMatrix();
+      renderOrders(allOrders);
+      lucide.createIcons();
+    }
+
+    function updateStats() {
+      let revenue = 0, shirts = 0, pending = 0, shipped = 0;
+      allOrders.forEach(o => {
+        if (o.status !== 'cancelled') {
+          revenue += (o.totalAmount || 0);
+          shirts += (o.totalQuantity || 0);
+        }
+        if (o.status === 'pending_slip') pending++;
+        if (o.status === 'shipped') shipped++;
+      });
+
+      document.getElementById('stat-revenue').innerText = `฿${revenue.toLocaleString()}`;
+      document.getElementById('stat-shirts').innerText = `${shirts} ตัว`;
+      document.getElementById('stat-pending').innerText = pending;
+      document.getElementById('stat-shipped').innerText = shipped;
+    }
+
+    // ================= PRODUCTION MATRIX =================
+    function renderMatrix() {
+      const sizes = ['S', 'M', 'L', 'XL', '2XL', '3XL'];
+      const matrix = {
+        Black: { S: 0, M: 0, L: 0, XL: 0, '2XL': 0, '3XL': 0, total: 0 },
+        White: { S: 0, M: 0, L: 0, XL: 0, '2XL': 0, '3XL': 0, total: 0 }
+      };
+
+      allOrders.forEach(o => {
+        if (o.status === 'cancelled') return;
+        (o.items || []).forEach(i => {
+          const c = i.color === 'Black' ? 'Black' : 'White';
+          const s = i.size;
+          const q = i.quantity || 1;
+          if (matrix[c] && matrix[c][s] !== undefined) {
+            matrix[c][s] += q;
+            matrix[c].total += q;
+          }
+        });
+      });
+
+      const body = document.getElementById('matrix-body');
+      body.innerHTML = `
+        <tr class="hover:bg-gray-50 transition">
+          <td class="py-3 px-4 text-left font-bold text-gray-900 flex items-center space-x-2">
+            <span class="w-3 h-3 rounded-full bg-black"></span>
+            <span>เสื้อสีดำ (Black)</span>
+          </td>
+          ${sizes.map(s => `<td class="py-3 px-3">${matrix.Black[s]}</td>`).join('')}
+          <td class="py-3 px-4 font-bold bg-gray-100 text-gray-900">${matrix.Black.total}</td>
+        </tr>
+        <tr class="hover:bg-gray-50 transition">
+          <td class="py-3 px-4 text-left font-bold text-gray-900 flex items-center space-x-2">
+            <span class="w-3 h-3 rounded-full bg-white border border-gray-300"></span>
+            <span>เสื้อสีขาว (White)</span>
+          </td>
+          ${sizes.map(s => `<td class="py-3 px-3">${matrix.White[s]}</td>`).join('')}
+          <td class="py-3 px-4 font-bold bg-gray-100 text-gray-900">${matrix.White.total}</td>
+        </tr>
+      `;
+
+      let grand = 0;
+      sizes.forEach(s => {
+        const sum = matrix.Black[s] + matrix.White[s];
+        grand += sum;
+        const el = document.getElementById(`m-tot-${s.toLowerCase()}`);
+        if (el) el.innerText = sum;
+      });
+      document.getElementById('m-grand-tot').innerText = `${grand} ตัว`;
+    }
+
+    function copyFactorySummary() {
+      const summary = `📦 สรุปยอดตัดเสื้อ Pre-Order เอ็ม ธวัชชัย:\n` +
+        `• เสื้อดำ: ${document.querySelector('#matrix-body tr:nth-child(1) td:last-child').innerText} ตัว\n` +
+        `• เสื้อขาว: ${document.querySelector('#matrix-body tr:nth-child(2) td:last-child').innerText} ตัว\n` +
+        `🔥 ยอดสั่งผลิตรวมทั้งสิ้น: ${document.getElementById('m-grand-tot').innerText}`;
+      navigator.clipboard.writeText(summary).then(() => {
+        alert('คัดลอกยอดตัดเสื้อเรียบร้อย พร้อมส่งต่อให้โรงงานทาง LINE ได้ทันทีครับ!');
+      });
+    }
+
+    // ================= MEDIA, AUDIO & VIDEO =================
+    function loadMediaPreviews() {
+      // Overview banner
+      const savedOverview = localStorage.getItem('MTC_IMG_OVERVIEW') || APP_CONFIG.product.images.overview || DEFAULT_SHIRT_PHOTOS.overview;
+      document.getElementById('prev-overview-img').src = savedOverview;
+      document.getElementById('input-overview-url').value = localStorage.getItem('MTC_OVERVIEW_URL') || '';
+
+      // 4 Shirt Photos
+      const keys = ['blackFront', 'blackBack', 'whiteFront', 'whiteBack'];
+      keys.forEach(k => {
+        const stored = localStorage.getItem(`MTC_IMG_${k.toUpperCase()}`) || APP_CONFIG.product.images[k] || DEFAULT_SHIRT_PHOTOS[k];
+        const el = document.getElementById(`prev-${k.replace(/([A-Z])/g, "-$1").toLowerCase()}`);
+        if (el) el.src = stored;
+      });
+
+      // Video Settings
+      const savedVideo = JSON.parse(localStorage.getItem('MTC_VIDEO_SETTINGS') || '{}');
+      document.getElementById('set-video-enable').checked = savedVideo.enabled !== undefined ? savedVideo.enabled : APP_CONFIG.video.enabled;
+      document.getElementById('set-video-url').value = savedVideo.url || APP_CONFIG.video.url;
+
+      // Check IndexedDB for uploaded video file
+      getVideoFromDB(function(videoBlob) {
+        if (videoBlob) {
+          const videoUrl = URL.createObjectURL(videoBlob);
+          document.getElementById('video-preview-tag').src = videoUrl;
+          document.getElementById('video-preview-wrapper').classList.remove('hidden');
+          document.getElementById('video-upload-status').innerText = '✓ มีไฟล์วิดีโอที่อัปโหลดไว้แล้ว';
+        }
+      });
+
+      // Audio
+      const storedAudio = localStorage.getItem('MTC_AUDIO_VOICE') || APP_CONFIG.audio.voiceFile;
+      if (storedAudio) document.getElementById('admin-audio-test').src = storedAudio;
+
+      // QR Code
+      const storedQr = localStorage.getItem('MTC_CUSTOM_QR') || APP_CONFIG.payment.customQrImage;
+      if (storedQr) document.getElementById('prev-qr-code').src = storedQr;
+    }
+
+    function uploadOverviewImage(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      compressImageFile(file, 1600, 0.85, function(compressedBase64) {
+        try {
+          localStorage.setItem('MTC_IMG_OVERVIEW', compressedBase64);
+          loadMediaPreviews();
+          document.getElementById('overview-upload-status').classList.remove('hidden');
+          alert('✓ อัปโหลดภาพรวมคอลเลกชันสำเร็จแล้ว! หน้าเว็บจะแสดงภาพนี้ทันที');
+        } catch(err) {
+          alert('ไฟล์มีขนาดใหญ่เกินความจุ แนะนำให้ใช้ช่อง "วิธีที่ 2: วางลิงก์รูปภาพ" ด้านล่างครับ');
+        }
+      });
+    }
+
+    function saveOverviewUrl() {
+      const url = document.getElementById('input-overview-url').value.trim();
+      if (!url) {
+        alert('กรุณากรอกลิงก์รูปภาพ');
+        return;
+      }
+      localStorage.setItem('MTC_IMG_OVERVIEW', url);
+      localStorage.setItem('MTC_OVERVIEW_URL', url);
+      loadMediaPreviews();
+      alert('✓ นำภาพจากลิงก์มาใช้เป็นภาพรวมคอลเลกชันเรียบร้อยแล้ว!');
+    }
+
+    function uploadProductImage(event, key) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      compressImageFile(file, 1000, 0.85, function(compressedBase64) {
+        try {
+          localStorage.setItem(`MTC_IMG_${key.toUpperCase()}`, compressedBase64);
+          loadMediaPreviews();
+          alert('✓ อัปโหลดรูปภาพสำเร็จเรียบร้อย!');
+        } catch(err) {
+          alert('ไฟล์มีขนาดใหญ่เกินความจุ แนะนำให้ย่อขนาดรูปภาพก่อนอัปโหลดครับ');
+        }
+      });
+    }
+
+    // UPLOAD DIRECT VIDEO FILE (Saves to IndexedDB - supports up to 100MB+)
+    function uploadVideoFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const statusEl = document.getElementById('video-upload-status');
+      statusEl.innerText = 'กำลังประมวลผลไฟล์วิดีโอ...';
+
+      saveVideoToDB(file, function(success) {
+        if (success) {
+          const videoUrl = URL.createObjectURL(file);
+          document.getElementById('video-preview-tag').src = videoUrl;
+          document.getElementById('video-preview-wrapper').classList.remove('hidden');
+          statusEl.innerText = `✓ อัปโหลดไฟล์วิดีโอ (${file.name}) สำเร็จแล้ว!`;
+          
+          // Mark in settings that we have an uploaded local video
+          const videoConfig = JSON.parse(localStorage.getItem('MTC_VIDEO_SETTINGS') || '{}');
+          videoConfig.hasUploadedFile = true;
+          videoConfig.fileName = file.name;
+          localStorage.setItem('MTC_VIDEO_SETTINGS', JSON.stringify(videoConfig));
+
+          alert('✓ อัปโหลดไฟล์วิดีโอขอบคุณสำเร็จ! วิดีโอจะเล่นในหน้าบัตร Digital Pre-order Pass ทันที');
+        } else {
+          alert('ไม่สามารถบันทึกไฟล์วิดีโอได้ กรุณาลองใหม่อีกครั้ง');
+        }
+      });
+    }
+
+    function saveVideoSettings() {
+      const videoConfig = JSON.parse(localStorage.getItem('MTC_VIDEO_SETTINGS') || '{}');
+      videoConfig.enabled = document.getElementById('set-video-enable').checked;
+      videoConfig.url = document.getElementById('set-video-url').value.trim();
+
+      localStorage.setItem('MTC_VIDEO_SETTINGS', JSON.stringify(videoConfig));
+      alert('✓ บันทึกการตั้งค่าวิดีโอขอบคุณสำเร็จ!');
+    }
+
+    function uploadAudioVoice(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          localStorage.setItem('MTC_AUDIO_VOICE', e.target.result);
+          document.getElementById('admin-audio-test').src = e.target.result;
+          document.getElementById('audio-status-label').innerText = `อัปโหลดไฟล์ ${file.name} เรียบร้อย`;
+          alert('✓ อัปโหลดไฟล์เสียงสำเร็จ!');
+        } catch(err) {
+          alert('ไฟล์เสียงมีขนาดใหญ่เกินไป แนะนำให้ใช้ไฟล์เสียง MP3 ความยาวไม่เกิน 1-2 นาทีครับ');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function uploadQrImage(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      compressImageFile(file, 600, 0.85, function(compressedBase64) {
+        localStorage.setItem('MTC_CUSTOM_QR', compressedBase64);
+        document.getElementById('prev-qr-code').src = compressedBase64;
+        alert('✓ อัปโหลดภาพ QR Code สำเร็จ!');
+      });
+    }
+
+    // ================= CONTENT, HEADLINES & SHIPPING =================
+    function toggleFreeShipAll(isAllFree) {
+      const inputs = document.getElementById('shipping-fee-inputs');
+      if (isAllFree) {
+        inputs.classList.add('opacity-40', 'pointer-events-none');
+      } else {
+        inputs.classList.remove('opacity-40', 'pointer-events-none');
+      }
+    }
+
+    function loadContentForm() {
+      // Ticker
+      const savedTicker = JSON.parse(localStorage.getItem('MTC_TICKER_SETTINGS') || '{}');
+      document.getElementById('edit-ticker-enabled').checked = savedTicker.enabled !== undefined ? savedTicker.enabled : APP_CONFIG.ticker.enabled;
+      document.getElementById('edit-ticker-text').value = savedTicker.text || APP_CONFIG.ticker.text;
+
+      // Content & Headlines
+      const saved = JSON.parse(localStorage.getItem('MTC_SITE_CONTENT') || '{}');
+      document.getElementById('edit-overview-title').value = saved.overviewTitle || "ภาพรวมคอลเลกชันเสื้อ \"เอ็ม ธวัชชัย\"";
+      document.getElementById('edit-overview-desc').value = saved.overviewDesc || "ดีไซน์สตรีทแวร์ Oversized Unisex มีให้เลือก 2 สีคลาสสิก (ดำ Street Black & ขาว Pure White)";
+
+      document.getElementById('edit-badge-text').value = saved.badgeText || "ผลิตตามยอดสั่งจองพรีออเดอร์เท่านั้น";
+      document.getElementById('edit-headline-1').value = saved.headline1 || "THE RESILIENCE";
+      document.getElementById('edit-headline-2').value = saved.headline2 || "เอ็ม ธวัชชัย";
+
+      document.getElementById('edit-fabric-tag').value = saved.fabricTag || "ผ้าพรีเมียม Heavy Cotton 260 GSM";
+      document.getElementById('edit-form-subtitle').value = saved.formSubtitle || "เลือกสีและไซส์ด้วยปุ่มขนาดใหญ่ (ระบบจดจำข้อมูลขณะสลับไปโอนเงิน ไม่ต้องพิมพ์ใหม่)";
+
+      document.getElementById('edit-prod-name').value = saved.name || APP_CONFIG.product.name;
+      document.getElementById('edit-prod-desc').value = saved.desc || "แม้สายตาจะมืดมิดจากการแพ้ยา แต่หัวใจไม่เคยหยุดสู้... เสื้อยืดสตรีทแวร์ทรง Oversized Unisex เนื้อผ้า Heavy Cotton 260 GSM ผ้านุ่ม ทรงสวย อยู่ทรง ไม่ย้วย";
+      document.getElementById('edit-price').value = saved.price || APP_CONFIG.product.price;
+      document.getElementById('edit-orig-price').value = saved.origPrice || APP_CONFIG.product.originalPrice;
+      
+      const isAllFree = saved.isFreeShippingAll || false;
+      document.getElementById('edit-free-ship-all').checked = isAllFree;
+      document.getElementById('edit-shipping').value = saved.shipping !== undefined ? saved.shipping : APP_CONFIG.product.shippingFee;
+      document.getElementById('edit-free-ship-qty').value = saved.freeShipQty || APP_CONFIG.product.freeShippingMinItems;
+      toggleFreeShipAll(isAllFree);
+    }
+
+    function saveWebsiteContent() {
+      // Save Ticker
+      const tickerSettings = {
+        enabled: document.getElementById('edit-ticker-enabled').checked,
+        text: document.getElementById('edit-ticker-text').value.trim()
+      };
+      localStorage.setItem('MTC_TICKER_SETTINGS', JSON.stringify(tickerSettings));
+
+      // Save Headlines, Content & Shipping
+      const isAllFree = document.getElementById('edit-free-ship-all').checked;
+      const content = {
+        overviewTitle: document.getElementById('edit-overview-title').value.trim() || "ภาพรวมคอลเลกชันเสื้อ \"เอ็ม ธวัชชัย\"",
+        overviewDesc: document.getElementById('edit-overview-desc').value.trim() || "ดีไซน์สตรีทแวร์ Oversized Unisex มีให้เลือก 2 สีคลาสสิก (ดำ Street Black & ขาว Pure White)",
+        badgeText: document.getElementById('edit-badge-text').value.trim() || "ผลิตตามยอดสั่งจองพรีออเดอร์เท่านั้น",
+        headline1: document.getElementById('edit-headline-1').value.trim() || "THE RESILIENCE",
+        headline2: document.getElementById('edit-headline-2').value.trim() || "เอ็ม ธวัชชัย",
+        fabricTag: document.getElementById('edit-fabric-tag').value.trim() || "ผ้าพรีเมียม Heavy Cotton 260 GSM",
+        formSubtitle: document.getElementById('edit-form-subtitle').value.trim() || "เลือกสีและไซส์ด้วยปุ่มขนาดใหญ่ (ระบบจดจำข้อมูลขณะสลับไปโอนเงิน ไม่ต้องพิมพ์ใหม่)",
+        name: document.getElementById('edit-prod-name').value.trim(),
+        desc: document.getElementById('edit-prod-desc').value.trim(),
+        price: parseFloat(document.getElementById('edit-price').value) || 590,
+        origPrice: parseFloat(document.getElementById('edit-orig-price').value) || 790,
+        isFreeShippingAll: isAllFree,
+        shipping: isAllFree ? 0 : (parseFloat(document.getElementById('edit-shipping').value) || 50),
+        freeShipQty: parseInt(document.getElementById('edit-free-ship-qty').value) || 2
+      };
+
+      localStorage.setItem('MTC_SITE_CONTENT', JSON.stringify(content));
+      alert('✓ บันทึกการตั้งค่าข้อความทุกจุด และค่าจัดส่งเรียบร้อยแล้ว!');
+    }
+
+    // ================= SUPABASE CLOUD & DB STATUS =================
+    function updateDbStatusPill() {
+      const isCloud = DB.isCloud();
+      const dot = document.getElementById('db-status-dot');
+      const text = document.getElementById('db-status-text');
+      const badge = document.getElementById('db-status-badge');
+      const cfgPill = document.getElementById('cfg-db-status-pill');
+
+      if (isCloud) {
+        if (dot) dot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+        if (text) text.innerText = "🟢 Supabase Cloud (ออนไลน์)";
+        if (badge) badge.className = "bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition";
+        if (cfgPill) {
+          cfgPill.className = "text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800";
+          cfgPill.innerText = "✓ เชื่อมต่อกับ Supabase Cloud สำเร็จ (ข้อมูลซิงก์กันทุกเครื่อง)";
+        }
+      } else {
+        if (dot) dot.className = "w-2 h-2 rounded-full bg-amber-500";
+        if (text) text.innerText = "🟠 LocalStorage (ออฟไลน์)";
+        if (badge) badge.className = "bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition";
+        if (cfgPill) {
+          cfgPill.className = "text-xs font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-800";
+          cfgPill.innerText = "⚠️ ยังไม่ได้ต่อ Cloud (บันทึกเฉพาะในเครื่องนี้)";
+        }
+      }
+    }
+
+    async function testSupabaseFromAdmin() {
+      const url = document.getElementById('set-sb-url').value.trim();
+      const key = document.getElementById('set-sb-key').value.trim();
+      const resBox = document.getElementById('sb-test-result');
+      resBox.classList.remove('hidden');
+      resBox.innerHTML = '<span class="text-gray-600">⏳ กำลังทดสอบการเชื่อมต่อไปยัง Supabase...</span>';
+
+      if (!url || !key) {
+        resBox.innerHTML = '<span class="text-red-600 font-bold">❌ กรุณากรอก URL และ Anon Key ให้ครบถ้วน</span>';
+        return;
+      }
+
+      const res = await DB.testConnection(url, key);
+      if (res.success) {
+        resBox.innerHTML = '<span class="text-emerald-700 font-bold">✓ ทดสอบสำเร็จ! เชื่อมต่อ Supabase Cloud Database ได้อย่างสมบูรณ์แบบ ข้อมูลพร้อมซิงก์ทุกอุปกรณ์</span>';
+      } else {
+        resBox.innerHTML = `<span class="text-red-600 font-bold">❌ เชื่อมต่อไม่สำเร็จ: ${res.message}</span>`;
+      }
+    }
+
+    async function saveSupabaseSettings() {
+      const url = document.getElementById('set-sb-url').value.trim();
+      const key = document.getElementById('set-sb-key').value.trim();
+
+      if (!url || !key) {
+        alert('กรุณากรอก Supabase Project URL และ Anon Key ให้ครบถ้วนครับ');
+        return;
+      }
+
+      const config = { url: url, anonKey: key, storageBucket: 'payment_slips' };
+      localStorage.setItem('MTC_SUPABASE_CONFIG', JSON.stringify(config));
+      DB.init();
+      updateDbStatusPill();
+      await loadAdminData();
+      alert('✓ บันทึกการเชื่อมต่อ Supabase Cloud เรียบร้อยแล้ว! ตอนนี้ข้อมูลคำสั่งซื้อจะเชื่อมโยงกันทุกอุปกรณ์และทุกเครื่องทันทีครับ');
+    }
+
+    function disconnectSupabase() {
+      if (confirm('คุณต้องการยกเลิกการเชื่อมต่อ Supabase แล้วสลับไปใช้ LocalStorage แบบออฟไลน์หรือไม่?')) {
+        localStorage.removeItem('MTC_SUPABASE_CONFIG');
+        DB.init();
+        updateDbStatusPill();
+        loadAdminData();
+        alert('สลับมาใช้ LocalStorage ในเครื่องนี้เรียบร้อยแล้ว');
+      }
+    }
+
+    // ================= BANK, PIN & RESET =================
+    function loadSettingsForm() {
+      // Supabase
+      const savedSb = JSON.parse(localStorage.getItem('MTC_SUPABASE_CONFIG') || '{}');
+      document.getElementById('set-sb-url').value = savedSb.url || (window.APP_CONFIG && APP_CONFIG.supabase ? APP_CONFIG.supabase.url : '');
+      document.getElementById('set-sb-key').value = savedSb.anonKey || (window.APP_CONFIG && APP_CONFIG.supabase ? APP_CONFIG.supabase.anonKey : '');
+      updateDbStatusPill();
+
+      // Bank
+      const savedBank = JSON.parse(localStorage.getItem('MTC_BANK_DETAILS') || '{}');
+      document.getElementById('set-bank-name').value = savedBank.bankName || APP_CONFIG.payment.bankName;
+      document.getElementById('set-bank-acc').value = savedBank.accountNumber || APP_CONFIG.payment.accountNumber;
+      document.getElementById('set-promptpay').value = savedBank.promptpayNumber || APP_CONFIG.payment.promptpayNumber;
+      document.getElementById('set-bank-holder').value = savedBank.accountName || APP_CONFIG.payment.accountName;
+    }
+
+    function saveBankDetails() {
+      const bank = {
+        bankName: document.getElementById('set-bank-name').value.trim(),
+        accountNumber: document.getElementById('set-bank-acc').value.trim(),
+        promptpayNumber: document.getElementById('set-promptpay').value.trim(),
+        accountName: document.getElementById('set-bank-holder').value.trim()
+      };
+      localStorage.setItem('MTC_BANK_DETAILS', JSON.stringify(bank));
+      alert('✓ บันทึกข้อมูลธนาคารเรียบร้อยแล้ว');
+    }
+
+    function saveNewAdminPin() {
+      const oldPin = document.getElementById('set-old-pin').value.trim();
+      const newPin = document.getElementById('set-new-pin').value.trim();
+
+      if (oldPin !== getAdminPin()) {
+        alert('รหัส PIN เดิมไม่ถูกต้อง');
+        return;
+      }
+      if (newPin.length < 4) {
+        alert('รหัส PIN ใหม่ต้องมีความยาวอย่างน้อย 4 ตัวอักษร');
+        return;
+      }
+      localStorage.setItem('MTC_CUSTOM_PIN', newPin);
+      document.getElementById('set-old-pin').value = '';
+      document.getElementById('set-new-pin').value = '';
+      alert('✓ เปลี่ยนรหัส PIN แอดมินสำเร็จแล้ว! (รหัสใหม่: ' + newPin + ')');
+    }
+
+    async function confirmResetAllOrders() {
+      const entered = prompt('⚠️ คำเตือน: คุณกำลังจะล้างข้อมูลคำสั่งซื้อและยอดสรุปทั้งหมด!\n(ระบบจะลบข้อมูลคำสั่งซื้อทดสอบทั้งบน Supabase Cloud และในเครื่องเพื่อเตรียมเปิดจองจริง)\n\nกรุณากรอกรหัส PIN แอดมินเพื่อยืนยัน:');
+      if (entered === null) return;
+
+      if (entered === getAdminPin()) {
+        await DB.clearAllOrders();
+        allOrders = [];
+        updateStats();
+        renderMatrix();
+        renderOrders([]);
+        alert('✓ ล้างข้อมูลคำสั่งซื้อทั้งหมดเรียบร้อยแล้ว! ระบบพร้อมสำหรับการเปิดรับพรีออเดอร์จริงแล้วครับ');
+      } else {
+        alert('รหัส PIN ไม่ถูกต้อง ไม่สามารถล้างข้อมูลได้');
+      }
+    }
+
+    // ================= ORDERS ACTIONS =================
+    function applyFilter() {
+      const q = document.getElementById('filter-search').value.trim().toLowerCase();
+      const st = document.getElementById('filter-status').value;
+
+      const filtered = allOrders.filter(o => {
+        const mQ = !q || (o.orderNumber && o.orderNumber.toLowerCase().includes(q)) ||
+                         (o.customerName && o.customerName.toLowerCase().includes(q)) ||
+                         (o.customerPhone && o.customerPhone.includes(q));
+        const mSt = st === 'ALL' || o.status === st;
+        return mQ && mSt;
+      });
+      renderOrders(filtered);
+    }
+
+    function renderOrders(orders) {
+      const tbody = document.getElementById('orders-table-body');
+      if (orders.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-gray-500 font-medium">ยังไม่มีรายการคำสั่งซื้อ</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = orders.map(o => {
+        const packing = (o.items || []).map(i => `${i.color === 'Black' ? 'ดำ' : 'ขาว'}-${i.size}x${i.quantity}`).join(', ');
+        return `
+          <tr class="hover:bg-gray-50 transition">
+            <td class="py-3 px-3 font-mono font-bold text-gray-900">${o.orderNumber}</td>
+            <td class="py-3 px-3">
+              <div class="font-bold text-gray-900">${o.customerName}</div>
+              <div class="text-[11px] font-mono text-gray-500">${o.customerPhone}</div>
+            </td>
+            <td class="py-3 px-3"><span class="text-orange-600 font-bold">${packing}</span></td>
+            <td class="py-3 px-3 font-mono font-bold text-gray-900">฿${o.totalAmount.toLocaleString()}</td>
+            <td class="py-3 px-3">
+              ${o.slipUrl ? `
+                <button onclick="viewSlip('${o.id}')" class="text-[11px] bg-gray-100 hover:bg-orange-600 hover:text-white border border-gray-300 px-2.5 py-1 rounded-lg transition flex items-center space-x-1 font-medium">
+                  <i data-lucide="image" class="w-3 h-3"></i>
+                  <span>ดูสลิป</span>
+                </button>
+              ` : '<span class="text-gray-400">ไม่มี</span>'}
+            </td>
+            <td class="py-3 px-3">
+              <select onchange="changeStatus('${o.id}', this.value)" class="bg-gray-50 border border-gray-300 rounded px-2 py-1 text-[11px] font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-orange-500">
+                <option value="pending_slip" ${o.status === 'pending_slip' ? 'selected' : ''}>รอตรวจสลิป</option>
+                <option value="verified" ${o.status === 'verified' ? 'selected' : ''}>ตรวจแล้ว</option>
+                <option value="in_production" ${o.status === 'in_production' ? 'selected' : ''}>กำลังผลิต</option>
+                <option value="shipped" ${o.status === 'shipped' ? 'selected' : ''}>จัดส่งแล้ว</option>
+                <option value="cancelled" ${o.status === 'cancelled' ? 'selected' : ''}>ยกเลิก</option>
+              </select>
+            </td>
+            <td class="py-3 px-3">
+              <input type="text" value="${o.trackingNumber || ''}" onblur="changeTracking('${o.id}', this.value)" placeholder="กรอกเลขพัสดุ" class="bg-gray-50 border border-gray-300 rounded px-2 py-1 text-[11px] font-mono text-gray-900 w-28 focus:outline-none focus:ring-1 focus:ring-orange-500">
+            </td>
+            <td class="py-3 px-3 text-right space-x-1 whitespace-nowrap">
+              <button onclick="openEditOrderModal('${o.id}')" class="text-[11px] bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 font-bold border border-blue-200 px-2.5 py-1.5 rounded-lg transition inline-flex items-center space-x-1 shadow-sm" title="แก้ไขข้อมูล/เปลี่ยนสีไซส์">
+                <i data-lucide="edit-2" class="w-3 h-3"></i>
+                <span>แก้ไข</span>
+              </button>
+              <button onclick="printLabel('${o.id}')" class="text-[11px] bg-orange-600 hover:bg-orange-700 text-white font-bold px-2.5 py-1.5 rounded-lg transition inline-flex items-center space-x-1 shadow-sm" title="พิมพ์ใบปะหน้า 100x150มม.">
+                <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                <span>ใบปะหน้า</span>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    async function changeStatus(id, st) {
+      await DB.updateOrder(id, { status: st });
+      allOrders = allOrders.map(o => (o.id === id || o.orderNumber === id) ? { ...o, status: st } : o);
+      updateStats();
+      renderMatrix();
+    }
+
+    async function changeTracking(id, tr) {
+      const trimmed = tr.trim();
+      const updates = { 
+        trackingNumber: trimmed, 
+        status: trimmed ? 'shipped' : undefined 
+      };
+      await DB.updateOrder(id, updates);
+      allOrders = allOrders.map(o => (o.id === id || o.orderNumber === id) ? { ...o, ...updates } : o);
+      updateStats();
+      applyFilter();
+    }
+
+    function viewSlip(id) {
+      const order = allOrders.find(o => o.id === id || o.orderNumber === id);
+      if (!order) return;
+      document.getElementById('slip-modal-img').src = order.slipUrl;
+      document.getElementById('slip-modal').classList.remove('hidden');
+
+      document.getElementById('slip-confirm-btn').onclick = async function() {
+        await changeStatus(id, 'verified');
+        closeSlipModal();
+        applyFilter();
+        alert('✓ อนุมัติสลิปเรียบร้อยแล้ว');
+      };
+    }
+
+    function closeSlipModal() {
+      document.getElementById('slip-modal').classList.add('hidden');
+    }
+
+    // ================= EDIT ORDER MODAL CONTROLLERS =================
+    let currentEditingOrderId = null;
+    let modalItems = [];
+
+    function openEditOrderModal(id) {
+      const order = allOrders.find(o => o.id === id || o.orderNumber === id);
+      if (!order) return;
+
+      currentEditingOrderId = order.id || order.orderNumber;
+      document.getElementById('edit-modal-order-id').value = currentEditingOrderId;
+      document.getElementById('edit-modal-order-num').innerText = order.orderNumber;
+
+      // Customer
+      document.getElementById('edit-cust-name').value = order.customerName || '';
+      document.getElementById('edit-cust-phone').value = order.customerPhone || '';
+      document.getElementById('edit-cust-contact').value = order.customerContact || '';
+
+      // Address
+      document.getElementById('edit-addr-detail').value = order.addressDetail || '';
+      document.getElementById('edit-addr-sub').value = order.subdistrict || '';
+      document.getElementById('edit-addr-dist').value = order.district || '';
+      document.getElementById('edit-addr-prov').value = order.province || '';
+      document.getElementById('edit-addr-postal').value = order.postalCode || '';
+
+      // Status & Tracking
+      document.getElementById('edit-order-status').value = order.status || 'pending_slip';
+      document.getElementById('edit-courier-name').value = order.courierName || 'Flash Express';
+      document.getElementById('edit-tracking-num').value = order.trackingNumber || '';
+      document.getElementById('edit-admin-notes').value = order.adminNotes || '';
+
+      // Items clone
+      modalItems = JSON.parse(JSON.stringify(order.items || []));
+      if (modalItems.length === 0) {
+        modalItems = [{ id: Date.now(), color: 'Black', size: 'L', quantity: 1, price: 590 }];
+      }
+      renderModalItems();
+
+      document.getElementById('edit-order-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeEditOrderModal() {
+      document.getElementById('edit-order-modal').classList.add('hidden');
+    }
+
+    function renderModalItems() {
+      const container = document.getElementById('modal-items-container');
+      const savedContent = JSON.parse(localStorage.getItem('MTC_SITE_CONTENT') || '{}');
+      const activePrice = savedContent.price || 590;
+
+      container.innerHTML = modalItems.map((item, idx) => `
+        <div class="bg-white p-3 rounded-xl border border-orange-200 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+          <div class="flex items-center space-x-2">
+            <span class="w-5 h-5 rounded-full bg-black text-white font-mono text-[10px] flex items-center justify-center font-bold">#${idx+1}</span>
+            <select onchange="updateModalItem(${idx}, 'color', this.value)" class="bg-gray-50 border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-gray-800">
+              <option value="Black" ${item.color === 'Black' ? 'selected' : ''}>🖤 สีดำ (Black)</option>
+              <option value="White" ${item.color === 'White' ? 'selected' : ''}>🤍 สีขาว (White)</option>
+            </select>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <span class="text-gray-500 font-semibold">ไซส์:</span>
+            <select onchange="updateModalItem(${idx}, 'size', this.value)" class="bg-gray-50 border border-gray-300 rounded-lg px-2 py-1.5 text-xs font-bold text-gray-800 font-mono">
+              ${['S','M','L','XL','2XL','3XL'].map(s => `<option value="${s}" ${item.size === s ? 'selected' : ''}>${s}</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <span class="text-gray-500 font-semibold">จำนวน:</span>
+            <div class="flex items-center border border-gray-300 rounded-lg bg-gray-50">
+              <button type="button" onclick="adjustModalItemQty(${idx}, -1)" class="w-7 h-7 flex items-center justify-center font-bold text-gray-700 hover:bg-gray-200 rounded-l-lg">-</button>
+              <span class="w-8 text-center font-mono font-bold text-xs">${item.quantity}</span>
+              <button type="button" onclick="adjustModalItemQty(${idx}, 1)" class="w-7 h-7 flex items-center justify-center font-bold text-gray-700 hover:bg-gray-200 rounded-r-lg">+</button>
+            </div>
+          </div>
+
+          <div>
+            ${modalItems.length > 1 ? `
+              <button type="button" onclick="removeModalItemRow(${idx})" class="text-red-500 hover:text-red-700 p-1" title="ลบเสื้อรายการนี้">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      `).join('');
+
+      // Recalculate totals in modal
+      const totalQty = modalItems.reduce((sum, i) => sum + i.quantity, 0);
+      const order = allOrders.find(o => o.id === currentEditingOrderId || o.orderNumber === currentEditingOrderId);
+      const shipFee = order ? (order.shippingFee || 0) : 0;
+      const grandTotal = (totalQty * activePrice) + shipFee;
+
+      document.getElementById('modal-total-qty').innerText = totalQty;
+      document.getElementById('modal-total-price').innerText = `฿${grandTotal.toLocaleString()}`;
+      lucide.createIcons();
+    }
+
+    function updateModalItem(idx, field, val) {
+      if (modalItems[idx]) {
+        modalItems[idx][field] = val;
+        renderModalItems();
+      }
+    }
+
+    function adjustModalItemQty(idx, delta) {
+      if (modalItems[idx]) {
+        modalItems[idx].quantity = Math.max(1, modalItems[idx].quantity + delta);
+        renderModalItems();
+      }
+    }
+
+    function addModalItemRow() {
+      modalItems.push({
+        id: Date.now(),
+        color: 'Black',
+        size: 'L',
+        quantity: 1,
+        price: 590
+      });
+      renderModalItems();
+    }
+
+    function removeModalItemRow(idx) {
+      if (modalItems.length <= 1) return;
+      modalItems.splice(idx, 1);
+      renderModalItems();
+    }
+
+    async function saveOrderEdit() {
+      if (!currentEditingOrderId) return;
+      const btn = document.getElementById('btn-save-order-edit');
+      const origText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span>กำลังบันทึก...</span>';
+
+      try {
+        const savedContent = JSON.parse(localStorage.getItem('MTC_SITE_CONTENT') || '{}');
+        const activePrice = savedContent.price || 590;
+        const totalQty = modalItems.reduce((sum, i) => sum + i.quantity, 0);
+        const order = allOrders.find(o => o.id === currentEditingOrderId || o.orderNumber === currentEditingOrderId);
+        const shipFee = order ? (order.shippingFee || 0) : 0;
+        const grandTotal = (totalQty * activePrice) + shipFee;
+
+        const updates = {
+          customerName: document.getElementById('edit-cust-name').value.trim(),
+          customerPhone: document.getElementById('edit-cust-phone').value.trim().replace(/[^0-9]/g, ''),
+          customerContact: document.getElementById('edit-cust-contact').value.trim(),
+          addressDetail: document.getElementById('edit-addr-detail').value.trim(),
+          subdistrict: document.getElementById('edit-addr-sub').value.trim(),
+          district: document.getElementById('edit-addr-dist').value.trim(),
+          province: document.getElementById('edit-addr-prov').value.trim(),
+          postalCode: document.getElementById('edit-addr-postal').value.trim(),
+          status: document.getElementById('edit-order-status').value,
+          courierName: document.getElementById('edit-courier-name').value.trim(),
+          trackingNumber: document.getElementById('edit-tracking-num').value.trim(),
+          adminNotes: document.getElementById('edit-admin-notes').value.trim(),
+          totalAmount: grandTotal
+        };
+
+        await DB.updateOrder(currentEditingOrderId, updates, modalItems);
+        await loadAdminData();
+        closeEditOrderModal();
+        alert('✓ บันทึกการแก้ไขคำสั่งซื้อเรียบร้อยแล้ว (อัปเดตยอดตัดเย็บโรงงานและข้อมูลคลาวด์แล้ว)');
+      } catch(err) {
+        console.error('Save edit error:', err);
+        alert('เกิดข้อผิดพลาดในการบันทึก: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+      }
+    }
+
+    async function cancelCurrentOrder() {
+      if (!currentEditingOrderId) return;
+      if (!confirm('ยืนยันยกเลิกคำสั่งซื้อนี้หรือไม่?\n\n(เมื่อยกเลิก ยอดเสื้อในออเดอร์นี้จะไม่ถูกนำไปรวมในตารางส่งโรงงานผลิต)')) return;
+
+      await DB.updateOrder(currentEditingOrderId, { status: 'cancelled' });
+      await loadAdminData();
+      closeEditOrderModal();
+      alert('✓ ปรับสถานะเป็น "ยกเลิกคำสั่งซื้อ" เรียบร้อยแล้ว');
+    }
+
+    async function deleteCurrentOrderPermanently() {
+      if (!currentEditingOrderId) return;
+      if (!confirm('⚠️ คำเตือน: คุณต้องการลบคำสั่งซื้อนี้ออกจากระบบอย่างถาวรหรือไม่?')) return;
+
+      await DB.deleteOrder(currentEditingOrderId);
+      await loadAdminData();
+      closeEditOrderModal();
+      alert('✓ ลบคำสั่งซื้อออกจากระบบเรียบร้อยแล้ว');
+    }
+
+    function printLabel(id) {
+      const order = allOrders.find(o => o.id === id);
+      if (!order) return;
+
+      document.getElementById('lbl-order-id').innerText = order.orderNumber;
+      document.getElementById('lbl-recipient-name').innerText = order.customerName;
+      document.getElementById('lbl-recipient-phone').innerText = order.customerPhone;
+      document.getElementById('lbl-recipient-address').innerText = 
+        `${order.addressDetail} ต.${order.subdistrict} อ.${order.district} จ.${order.province}`;
+      document.getElementById('lbl-recipient-postal').innerText = order.postalCode;
+      document.getElementById('lbl-pack-qty').innerText = `รวม ${order.totalQuantity} ตัว`;
+
+      const packingItems = (order.items || []).map(i => `[${i.color === 'Black' ? 'ดำ' : 'ขาว'}-${i.size} x ${i.quantity}]`).join('  ');
+      document.getElementById('lbl-packing-items').innerText = packingItems;
+
+      try {
+        JsBarcode("#barcode-canvas", order.orderNumber, {
+          format: "CODE128",
+          lineColor: "#000",
+          width: 2,
+          height: 40,
+          displayValue: false
+        });
+      } catch(e) {}
+
+      window.print();
+    }
+
+    function exportToCSV() {
+      if (allOrders.length === 0) {
+        alert('ไม่มีข้อมูลคำสั่งซื้อ');
+        return;
+      }
+      let csv = "\uFEFFเลขออเดอร์,ชื่อผู้รับ,เบอร์โทรศัพท์,ที่อยู่,ตำบล,อำเภอ,จังหวัด,รหัสไปรษณีย์,รายการของที่ต้องแพ็ค,จำนวนรวม,ยอดโอน,สถานะ,เลขพัสดุ\n";
+      allOrders.forEach(o => {
+        const packingStr = (o.items || []).map(i => `${i.color === 'Black' ? 'ดำ' : 'ขาว'}-${i.size}x${i.quantity}`).join(' | ');
+        csv += `"${o.orderNumber}","${o.customerName}","${o.customerPhone}","${o.addressDetail.replace(/"/g, '""')}","${o.subdistrict}","${o.district}","${o.province}","${o.postalCode}","${packingStr}",${o.totalQuantity},${o.totalAmount},"${o.status}","${o.trackingNumber || ''}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute("download", `orders_m_thawatchai_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>

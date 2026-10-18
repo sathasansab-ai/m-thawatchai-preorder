@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ตรวจสอบสถานะคำสั่งซื้อ | M THAWATCHAI Pre-Order</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Prompt & Bebas Neue -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase Cloud Database Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Prompt', 'sans-serif'],
+            display: ['Bebas Neue', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              black: '#111827',
+              accent: '#EA580C',
+              accentHover: '#C2410C',
+              bg: '#F9FAFB'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-[#F8F9FA] text-gray-800 font-sans antialiased min-h-screen flex flex-col justify-between selection:bg-orange-500 selection:text-white">
+
+  <!-- HEADER -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
+      <a href="index.html" class="flex items-center space-x-3 group">
+        <div class="w-10 h-10 bg-black text-white font-display text-2xl flex items-center justify-center font-black rounded-xl group-hover:bg-orange-600 transition shadow">
+          M
+        </div>
+        <div>
+          <span class="font-display text-3xl tracking-wider text-gray-900 block leading-none">M THAWATCHAI</span>
+          <span class="text-[11px] text-orange-600 font-bold tracking-widest uppercase">PRE-ORDER TRACKING</span>
+        </div>
+      </a>
+
+      <div class="flex items-center space-x-4 text-xs font-bold">
+        <a href="index.html" class="text-gray-600 hover:text-gray-900 transition flex items-center space-x-1 bg-gray-100 px-3.5 py-2 rounded-xl">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i>
+          <span>กลับหน้าสั่งซื้อ</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="max-w-3xl mx-auto px-4 sm:px-6 py-12 w-full flex-grow">
+    
+    <div class="text-center space-y-3 mb-10">
+      <div class="inline-flex items-center space-x-2 bg-orange-100 text-orange-700 px-3.5 py-1 rounded-full text-xs font-bold">
+        <i data-lucide="search" class="w-3.5 h-3.5"></i>
+        <span>ระบบตรวจสอบสถานะพัสดุและยอดโอน</span>
+      </div>
+      <h1 class="text-4xl sm:text-5xl font-display uppercase tracking-wider text-gray-900">
+        TRACK YOUR ORDER
+      </h1>
+      <p class="text-sm text-gray-500 max-w-md mx-auto">
+        กรอกเบอร์โทรศัพท์ที่ใช้ตอนลงทะเบียนสั่งจอง เพื่อตรวจสอบสถานะสลิปและการจัดส่งได้ทันที
+      </p>
+    </div>
+
+    <!-- Search Form -->
+    <div class="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 shadow-md mb-8">
+      <form onsubmit="handleSearchOrders(event)" class="flex flex-col sm:flex-row gap-3">
+        <div class="relative flex-grow">
+          <input type="tel" id="search-phone" required placeholder="กรอกเบอร์โทรศัพท์ เช่น 0891234567 หรือเลขออเดอร์" class="w-full bg-gray-50 border border-gray-300 rounded-2xl pl-11 pr-4 py-3.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono">
+          <i data-lucide="phone" class="w-4 h-4 text-gray-400 absolute left-4 top-4"></i>
+        </div>
+        <button type="submit" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3.5 px-8 rounded-2xl text-sm uppercase tracking-wider transition flex items-center justify-center space-x-2 flex-shrink-0 shadow-sm">
+          <i data-lucide="search" class="w-4 h-4"></i>
+          <span>ค้นหาออเดอร์</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- Results Container -->
+    <div id="results-area" class="space-y-6">
+      <!-- Welcome empty state -->
+      <div id="initial-state" class="text-center py-12 border-2 border-dashed border-gray-200 rounded-3xl p-6 bg-white">
+        <i data-lucide="package-search" class="w-12 h-12 text-gray-400 mx-auto mb-3"></i>
+        <p class="text-sm text-gray-500">กรอกเบอร์โทรศัพท์ในช่องด้านบนเพื่อดูข้อมูลคำสั่งซื้อของคุณ</p>
+      </div>
+
+      <!-- Result cards will render here dynamically -->
+      <div id="order-cards-list" class="space-y-6 hidden"></div>
+
+      <!-- Not found state -->
+      <div id="not-found-state" class="hidden text-center py-12 bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
+        <div class="w-12 h-12 rounded-full bg-red-100 text-red-500 mx-auto flex items-center justify-center mb-3">
+          <i data-lucide="alert-circle" class="w-6 h-6"></i>
+        </div>
+        <h4 class="text-base font-bold text-gray-900 mb-1">ไม่พบข้อมูลคำสั่งซื้อด้วยเบอร์โทรนี้</h4>
+        <p class="text-xs text-gray-500 max-w-sm mx-auto mb-4">
+          กรุณาตรวจสอบว่ากรอกเบอร์โทรตรงกับตอนที่ลงทะเบียนหรือไม่ หรือติดต่อทีมงานหากต้องการความช่วยเหลือ
+        </p>
+        <a href="index.html#order-form-section" class="inline-flex items-center space-x-2 text-xs text-orange-600 font-bold hover:underline">
+          <span>กลับไปสั่งจองเสื้อ</span>
+          <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+        </a>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="bg-white border-t border-gray-200 py-8 text-xs text-gray-500 text-center">
+    <p>© 2026 M Thawatchai Official Pre-Order Portal</p>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="db.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const phoneParam = urlParams.get('phone');
+      if (phoneParam) {
+        document.getElementById('search-phone').value = phoneParam;
+        searchOrders(phoneParam);
+      }
+    });
+
+    function handleSearchOrders(event) {
+      event.preventDefault();
+      const query = document.getElementById('search-phone').value.trim();
+      if (!query) return;
+      searchOrders(query);
+    }
+
+    async function searchOrders(query) {
+      const cleanQuery = query.replace(/[^a-zA-Z0-9]/g, '');
+      const initialState = document.getElementById('initial-state');
+      const notFoundState = document.getElementById('not-found-state');
+      const orderCardsList = document.getElementById('order-cards-list');
+
+      initialState.classList.add('hidden');
+      notFoundState.classList.add('hidden');
+      orderCardsList.classList.add('hidden');
+
+      // Fetch from unified DB (Supabase Cloud with local fallback)
+      let matchedOrders = [];
+      try {
+        matchedOrders = await DB.findOrdersByPhone(query);
+      } catch(e) {
+        matchedOrders = [];
+      }
+
+      if (!matchedOrders || matchedOrders.length === 0) {
+        notFoundState.classList.remove('hidden');
+        return;
+      }
+
+      orderCardsList.innerHTML = matchedOrders.map(order => renderOrderCard(order)).join('');
+      orderCardsList.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function renderOrderCard(order) {
+      const statusMap = {
+        'pending_slip': { text: 'รอตรวจสอบสลิป', color: 'text-yellow-700', bg: 'bg-yellow-100', border: 'border-yellow-200', step: 1 },
+        'verified': { text: 'ตรวจสลิปเรียบร้อยแล้ว', color: 'text-blue-700', bg: 'bg-blue-100', border: 'border-blue-200', step: 2 },
+        'in_production': { text: 'อยู่ระหว่างขั้นตอนผลิต', color: 'text-purple-700', bg: 'bg-purple-100', border: 'border-purple-200', step: 3 },
+        'shipped': { text: 'จัดส่งพัสดุเรียบร้อยแล้ว', color: 'text-emerald-700', bg: 'bg-emerald-100', border: 'border-emerald-200', step: 4 },
+        'cancelled': { text: 'ยกเลิกคำสั่งซื้อ', color: 'text-red-700', bg: 'bg-red-100', border: 'border-red-200', step: 0 }
+      };
+
+      const currStatus = statusMap[order.status] || statusMap['pending_slip'];
+      const dateStr = new Date(order.createdAt).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const packingItems = (order.items || []).map(i => `${i.color === 'Black' ? 'ดำ' : 'ขาว'}-${i.size} x ${i.quantity}`).join(', ');
+
+      return `
+        <div class="bg-white border border-gray-200 rounded-3xl p-6 shadow-md space-y-6">
+          <!-- Header -->
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4">
+            <div>
+              <span class="text-[10px] text-gray-500 uppercase tracking-widest block">ORDER NUMBER</span>
+              <h3 class="font-mono text-xl font-bold text-gray-900">${order.orderNumber}</h3>
+              <span class="text-xs text-gray-500">${dateStr}</span>
+            </div>
+            <div>
+              <span class="inline-flex items-center space-x-1.5 px-3.5 py-1 rounded-full text-xs font-bold ${currStatus.bg} ${currStatus.color} border ${currStatus.border}">
+                <span class="w-2 h-2 rounded-full bg-current"></span>
+                <span>${currStatus.text}</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Stepper -->
+          <div class="py-2">
+            <div class="grid grid-cols-4 gap-2 text-center">
+              <div class="space-y-1">
+                <div class="w-8 h-8 mx-auto rounded-full flex items-center justify-center text-xs font-bold ${currStatus.step >= 1 ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-400'}">1</div>
+                <div class="text-[11px] ${currStatus.step >= 1 ? 'text-gray-900 font-bold' : 'text-gray-400'}">รับออเดอร์</div>
+              </div>
+              <div class="space-y-1">
+                <div class="w-8 h-8 mx-auto rounded-full flex items-center justify-center text-xs font-bold ${currStatus.step >= 2 ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-400'}">2</div>
+                <div class="text-[11px] ${currStatus.step >= 2 ? 'text-gray-900 font-bold' : 'text-gray-400'}">สลิปผ่าน</div>
+              </div>
+              <div class="space-y-1">
+                <div class="w-8 h-8 mx-auto rounded-full flex items-center justify-center text-xs font-bold ${currStatus.step >= 3 ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-400'}">3</div>
+                <div class="text-[11px] ${currStatus.step >= 3 ? 'text-gray-900 font-bold' : 'text-gray-400'}">ผลิตตัดเย็บ</div>
+              </div>
+              <div class="space-y-1">
+                <div class="w-8 h-8 mx-auto rounded-full flex items-center justify-center text-xs font-bold ${currStatus.step >= 4 ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-400'}">4</div>
+                <div class="text-[11px] ${currStatus.step >= 4 ? 'text-gray-900 font-bold' : 'text-gray-400'}">จัดส่งแล้ว</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tracking Number Box -->
+          ${order.trackingNumber ? `
+            <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <span class="text-[10px] text-emerald-800 font-bold uppercase tracking-wider block">ขนส่ง: ${order.courierName || 'Flash Express'}</span>
+                <span class="font-mono text-lg font-bold text-gray-900 tracking-wider">${order.trackingNumber}</span>
+              </div>
+              <button onclick="navigator.clipboard.writeText('${order.trackingNumber}'); alert('คัดลอกเลขพัสดุแล้ว');" class="text-xs bg-emerald-600 text-white font-bold px-3.5 py-2 rounded-xl hover:bg-emerald-700 transition shadow-sm">
+                คัดลอกเลขพัสดุ
+              </button>
+            </div>
+          ` : ''}
+
+          <!-- Items Breakdown -->
+          <div class="bg-gray-50 p-4 rounded-2xl text-xs space-y-2 border border-gray-200">
+            <span class="text-gray-500 font-bold block mb-1">รายการเสื้อที่สั่ง:</span>
+            <div class="text-gray-900 font-bold text-sm">${packingItems}</div>
+            <div class="text-gray-600 flex justify-between pt-2 border-t border-gray-200">
+              <span>ผู้รับ: ${order.customerName} (${order.customerPhone})</span>
+              <span class="font-mono font-bold text-orange-600 text-sm">ยอดรวม: ฿${order.totalAmount.toLocaleString()}</span>
+            </div>
+            <div class="text-gray-500 text-[11px]">
+              ที่อยู่: ${order.addressDetail} ต.${order.subdistrict} อ.${order.district} จ.${order.province} ${order.postalCode}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
